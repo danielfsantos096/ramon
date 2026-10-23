@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 20% 98%;
+    --foreground: 224 40% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 224 40% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 40% 10%;
+    --primary: 239 84% 62%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 16% 94%;
+    --secondary-foreground: 224 40% 14%;
+    --muted: 220 16% 94%;
+    --muted-foreground: 220 9% 40%;
+    --accent: 220 16% 92%;
+    --accent-foreground: 224 40% 14%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 14% 88%;
+    --input: 220 14% 88%;
+    --ring: 239 84% 62%;
+    --success: 152 62% 34%;
+    --warning: 38 92% 45%;
+    --radius: 1rem;
+  }
+
+  .dark {
+    --background: 226 32% 6%;
+    --foreground: 210 20% 96%;
+    --card: 226 28% 9%;
+    --card-foreground: 210 20% 96%;
+    --popover: 226 28% 10%;
+    --popover-foreground: 210 20% 96%;
+    --primary: 239 90% 70%;
+    --primary-foreground: 226 32% 8%;
+    --secondary: 226 20% 14%;
+    --secondary-foreground: 210 20% 96%;
+    --muted: 226 20% 14%;
+    --muted-foreground: 220 12% 66%;
+    --accent: 226 20% 16%;
+    --accent-foreground: 210 20% 96%;
+    --destructive: 0 72% 58%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 226 18% 17%;
+    --input: 226 18% 17%;
+    --ring: 239 90% 70%;
+    --success: 152 60% 52%;
+    --warning: 38 92% 58%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: "Inter Variable", Inter, system-ui, sans-serif;
+    font-feature-settings: "cv11", "ss01", "tnum";
+    min-height: 100dvh;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(60rem 30rem at 85% -10%, hsl(var(--primary) / 0.12), transparent 60%),
+      radial-gradient(50rem 28rem at -10% 0%, hsl(var(--primary) / 0.07), transparent 55%);
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+}
+
+/* Recharts: remove outline ao clicar */
+.recharts-wrapper,
+.recharts-surface {
+  outline: none;
+}
