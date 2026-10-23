@@ -34,7 +34,6 @@ Preencha:
 | `SHEET_ID` | ID da planilha |
 | `GOOGLE_SERVICE_ACCOUNT_EMAIL` | `client_email` do JSON |
 | `GOOGLE_PRIVATE_KEY` | `private_key` do JSON, entre aspas, em uma linha, com `\n` literais (o código aplica `.replace(/\\n/g, "\n")`) |
-| `BASIC_AUTH_USER` / `BASIC_AUTH_PASSWORD` | Usuário e senha do site. **Obrigatórias em produção** (sem elas o site responde 503) |
 | `CAMPAIGN_START` | (opcional) início da captação `AAAA-MM-DD`; padrão = menor data das abas |
 | `DEMO_MODE` | (opcional) `true` usa dados fictícios para pré-visualizar |
 
@@ -44,7 +43,6 @@ npm install
 npm run dev        # http://localhost:3000
 npm run build && npm start
 ```
-Em desenvolvimento, sem `BASIC_AUTH_*` o acesso é liberado; em produção é bloqueado.
 
 ### 5. Deploy (Vercel)
 Suba o repositório no GitHub, importe na Vercel e cadastre as mesmas variáveis em **Settings → Environment Variables** (cole a `GOOGLE_PRIVATE_KEY` entre aspas, com `\n`).
@@ -76,5 +74,4 @@ lib/sheets.ts             cliente Google Sheets (server-only)
 lib/normalize.ts          parsing das abas
 lib/parse.ts              números/datas pt-BR
 lib/metrics.ts            filtros, KPIs, séries, deltas
-middleware.ts             Basic Auth
 ```
