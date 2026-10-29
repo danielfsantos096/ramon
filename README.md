@@ -57,14 +57,14 @@ Nenhuma outra aba é lida; todas as métricas são calculadas dessas duas abas b
 
 - Colunas são localizadas pelo **nome do cabeçalho** (com fallback pela posição indicada no pedido).
 - Conversões: `R$ 1.234,56` e `225,84` → número; `dd/mm/aaaa` → ISO; `#N/A`, linhas vazias e linhas de template (ex.: "Campaign Name") são ignoradas; UTMs vazias viram "Sem UTM".
-- `/api/data` usa `revalidate = 300` + `unstable_cache` (5 min); o cliente usa SWR com `refreshInterval` de 5 min e o badge "Atualizado há X min" (clique para atualizar).
+- `/api/data` é sempre dinâmica (`force-dynamic`) e guarda a planilha em cache por 5 min (`s-maxage=300` na CDN + memória da instância; se a leitura falhar, serve o último dado bom). O cliente usa SWR com `refreshInterval` de 5 min, atualiza também ao voltar para a aba e com a aba em segundo plano, e mostra o badge "Atualizado há X min" (clique para atualizar).
 
 ## Definições de métrica
 - **Valor investido** e **Leads Tráfego** (Website Leads) vêm da aba Meta Ads. **Leads AC** = linhas da aba Leads.
 - **CPL Tráfego** = valor ÷ leads tráfego · **CPL AC** = valor ÷ leads AC · **CPL AC-UTMs** = valor ÷ leads AC com Campaign preenchida.
 - **CTR** = cliques ÷ impressões · **CPC** = valor ÷ cliques · **CPM** = valor ÷ impressões × 1000 · **Tx. carregamento** = LPV ÷ cliques · **Tx. conversão** = leads ÷ LPV.
-- **Sem UTMs** = Campaign vazia. **Tráfego / Orgânico** (página Leads): com Campaign, é tráfego quando `Source` é plataforma paga (fb, ig, meta…) ou `Medium` indica mídia paga; senão, orgânico. Ajuste em `lib/config.ts` (`PAID_SOURCES`, `PAID_MEDIUM_HINTS`).
-- Filtros de público/criativo: nos leads do AC usam `Medium` e `Content`.
+- **Sem UTMs** = lead sem nenhuma UTM (campaign, source, medium, content e term vazios). **Tráfego** = a UTM aponta para a Meta: campanha, público (`Medium`) ou criativo (`Content`) existem na aba Meta Ads (comparação sem acento/caixa, ignorando o ID final da Meta), ou `Source` é código da Meta (`PAID_SOURCES`: fb, ig, an, msg), ou `Medium` indica mídia paga (`PAID_MEDIUM_HINTS`). **Orgânico** = tem alguma UTM mas não veio do tráfego. Ajuste em `lib/config.ts`.
+- Filtros: na Visão geral e no Meta Ads o filtro de campanha usa os nomes da aba Meta Ads; na **Análise de Leads** ele lista as campanhas (coluna Campaign) da própria aba Leads, com a contagem de linhas de cada uma. Público/criativo usam `Medium`/`Content` nos leads. Sem investimento no recorte, o CPL aparece como "—".
 
 ## Estrutura
 ```

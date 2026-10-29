@@ -14,9 +14,11 @@ interface Props {
   onChange: (value: string[]) => void;
   hint?: string;
   className?: string;
+  /** Contagem exibida ao lado de cada opção (ex.: linhas da planilha). */
+  counts?: Record<string, number>;
 }
 
-export function MultiSelect({ label, options, value, onChange, hint, className }: Props) {
+export function MultiSelect({ label, options, value, onChange, hint, className, counts }: Props) {
   const [query, setQuery] = React.useState("");
   const filtered = React.useMemo(
     () => options.filter((o) => o.toLowerCase().includes(query.trim().toLowerCase())),
@@ -80,7 +82,12 @@ export function MultiSelect({ label, options, value, onChange, hint, className }
                 >
                   {selected && <Check className="size-3" />}
                 </span>
-                <span className="break-words">{opt}</span>
+                <span className="min-w-0 flex-1 break-words">{opt}</span>
+                {counts && (
+                  <span className="ml-2 shrink-0 text-xs tabular text-muted-foreground">
+                    {(counts[opt] ?? 0).toLocaleString("pt-BR")}
+                  </span>
+                )}
               </button>
             );
           })}

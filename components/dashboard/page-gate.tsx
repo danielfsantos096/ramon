@@ -75,18 +75,6 @@ export function PageGate({ children }: { children: React.ReactNode }) {
         </div>
       )}
       {children}
-      {data.warnings.length > 0 && (
-        <details className="rounded-lg border border-border/70 bg-card/50 px-3 py-2 text-xs text-muted-foreground">
-          <summary className="cursor-pointer select-none font-medium">
-            {data.warnings.length} aviso(s) de qualidade de dados
-          </summary>
-          <ul className="mt-2 list-disc space-y-1 pl-5">
-            {data.warnings.map((w, i) => (
-              <li key={i}>{w}</li>
-            ))}
-          </ul>
-        </details>
-      )}
     </div>
   );
 }

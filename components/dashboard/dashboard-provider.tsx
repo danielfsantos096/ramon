@@ -2,17 +2,21 @@
 
 import * as React from "react";
 import useSWR from "swr";
+import { usePathname } from "next/navigation";
 import { REFRESH_MS } from "@/lib/config";
 import {
   EMPTY_FILTERS,
+  buildClassifier,
   dailySeries,
   previousRange,
   sliceData,
   summarize,
   todayISO,
   uniqueSorted,
+  adCampaignMatchesLead,
   type DailyPoint,
   type Filters,
+  type Scope,
   type Slice,
   type Summary,
 } from "@/lib/metrics";
@@ -27,7 +31,8 @@ class FetchError extends Error {
 }
 
 async function fetcher(url: string): Promise<ApiData> {
-  const res = await fetch(url, { credentials: "same-origin" });
+  // no-store: nunca reaproveita resposta do cache do navegador; o cache de 5 min fica no servidor/CDN.
+  const res = await fetch(url, { credentials: "same-origin", cache: "no-store" });
   if (!res.ok) {
     let message = "Falha ao carregar dados.";
     let code: string | undefined;
@@ -69,7 +74,16 @@ interface Ctx {
   filters: Filters;
   setFilters: (patch: Partial<Filters>) => void;
   clearFilters: () => void;
-  options: { campaigns: string[]; adsets: string[]; ads: string[] };
+  /** "ads": campanhas da Meta · "leads": campanhas da aba Leads (Análise de Leads). */
+  scope: Scope;
+  options: {
+    campaigns: string[];
+    leadCampaigns: string[];
+    /** Linhas da aba Leads por campanha (no período e filtro de leads novos). */
+    leadCampaignCounts: Record<string, number>;
+    adsets: string[];
+    ads: string[];
+  };
 
   slice: Slice;
   prevSlice: Slice;
@@ -89,13 +103,25 @@ export function useDashboard(): Ctx {
 export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const { data, error, isLoading, isValidating, mutate } = useSWR<ApiData, FetchError>("/api/data", fetcher, {
     refreshInterval: REFRESH_MS,
-    revalidateOnFocus: false,
+    refreshWhenHidden: true, // continua atualizando com a aba em segundo plano
+    revalidateOnFocus: true, // ao voltar para a aba, busca dados novos
+    focusThrottleInterval: 60_000,
+    revalidateOnReconnect: true,
+    dedupingInterval: 15_000,
     keepPreviousData: true,
     shouldRetryOnError: true,
     errorRetryInterval: 30_000,
   });
 
-  const today = React.useMemo(() => todayISO(), []);
+  const pathname = usePathname();
+  const scope: Scope = pathname?.startsWith("/leads") ? "leads" : "ads";
+
+  // "Hoje" acompanha a virada do dia, mesmo com a aba aberta por dias.
+  const [today, setToday] = React.useState(todayISO);
+  React.useEffect(() => {
+    const id = setInterval(() => setToday((t) => (todayISO() === t ? t : todayISO())), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const [fromOverride, setFromOverride] = React.useState<string | null>(null);
   const [toOverride, setToOverride] = React.useState<string | null>(null);
@@ -130,23 +156,47 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   }, []);
   const clearFilters = React.useCallback(() => setFiltersState(EMPTY_FILTERS), []);
 
+  const classify = React.useMemo(() => buildClassifier(d.ads), [d.ads]);
+
   const options = React.useMemo(() => {
-    const campaignSet = new Set(filters.campaigns);
-    const inCampaign = d.ads.filter((r) => campaignSet.size === 0 || campaignSet.has(r.campaign));
+    // Opções de público/criativo respeitam a campanha escolhida (quando há correspondência).
+    let inCampaign = d.ads;
+    if (scope === "ads" && filters.campaigns.length) {
+      const set = new Set(filters.campaigns);
+      inCampaign = d.ads.filter((r) => set.has(r.campaign));
+    } else if (scope === "leads" && filters.leadCampaigns.length) {
+      const matched = d.ads.filter((r) => adCampaignMatchesLead(r.campaign, filters.leadCampaigns));
+      if (matched.length) inCampaign = matched;
+    }
+
+    // Campanhas da aba Leads: contagem de linhas da planilha por campanha.
+    const counts: Record<string, number> = {};
+    for (const l of d.leads) {
+      if (l.date < range.from || l.date > range.to) continue;
+      if (filters.onlyNewLeads && l.old) continue;
+      counts[l.campaign] = (counts[l.campaign] ?? 0) + l.count;
+    }
+    const allLeadCampaigns = uniqueSorted(d.leads.map((l) => l.campaign));
+    const leadCampaigns = allLeadCampaigns.sort(
+      (a, b) => (counts[b] ?? 0) - (counts[a] ?? 0) || a.localeCompare(b, "pt-BR")
+    );
+
     return {
       campaigns: uniqueSorted(d.ads.map((r) => r.campaign)),
+      leadCampaigns,
+      leadCampaignCounts: counts,
       adsets: uniqueSorted(inCampaign.map((r) => r.adset)),
       ads: uniqueSorted(inCampaign.map((r) => r.ad)),
     };
-  }, [d.ads, filters.campaigns]);
+  }, [d.ads, d.leads, scope, filters.campaigns, filters.leadCampaigns, filters.onlyNewLeads, range]);
 
-  const slice = React.useMemo(() => sliceData(d, filters, range.from, range.to), [d, filters, range]);
+  const slice = React.useMemo(() => sliceData(d, filters, range.from, range.to, scope), [d, filters, range, scope]);
   const prevSlice = React.useMemo(
-    () => sliceData(d, filters, prevRange.from, prevRange.to),
-    [d, filters, prevRange]
+    () => sliceData(d, filters, prevRange.from, prevRange.to, scope),
+    [d, filters, prevRange, scope]
   );
-  const summary = React.useMemo(() => summarize(slice), [slice]);
-  const prevSummary = React.useMemo(() => summarize(prevSlice), [prevSlice]);
+  const summary = React.useMemo(() => summarize(slice, classify), [slice, classify]);
+  const prevSummary = React.useMemo(() => summarize(prevSlice, classify), [prevSlice, classify]);
   const daily = React.useMemo(() => dailySeries(slice, range.from, range.to), [slice, range]);
 
   const value = React.useMemo<Ctx>(
@@ -165,6 +215,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       filters,
       setFilters,
       clearFilters,
+      scope,
       options,
       slice,
       prevSlice,
@@ -174,7 +225,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       data, error, isLoading, isValidating, mutate, today, range, prevRange, fromOverride, toOverride,
-      setRange, resetRange, filters, setFilters, clearFilters, options, slice, prevSlice, summary, prevSummary, daily,
+      setRange, resetRange, filters, setFilters, clearFilters, scope, options, slice, prevSlice, summary, prevSummary, daily,
     ]
   );
 

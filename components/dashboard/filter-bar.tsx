@@ -18,7 +18,7 @@ const PRESETS = [
 export function FilterBar() {
   const {
     range, setRange, resetRange, rangeIsCustom, today,
-    filters, setFilters, clearFilters, options, data,
+    filters, setFilters, clearFilters, options, data, scope,
   } = useDashboard();
   const [open, setOpen] = React.useState(false);
 
@@ -79,12 +79,23 @@ export function FilterBar() {
         <div className="hidden h-9 w-px bg-border sm:block" />
 
         <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
-          <MultiSelect
-            label="Campanha"
-            options={options.campaigns}
-            value={filters.campaigns}
-            onChange={(campaigns) => setFilters({ campaigns })}
-          />
+          {scope === "leads" ? (
+            <MultiSelect
+              label="Campanha"
+              options={options.leadCampaigns}
+              counts={options.leadCampaignCounts}
+              value={filters.leadCampaigns}
+              onChange={(leadCampaigns) => setFilters({ leadCampaigns })}
+              hint="Campanhas (UTM Campaign) da aba Leads, com a contagem de linhas da planilha."
+            />
+          ) : (
+            <MultiSelect
+              label="Campanha"
+              options={options.campaigns}
+              value={filters.campaigns}
+              onChange={(campaigns) => setFilters({ campaigns })}
+            />
+          )}
           <MultiSelect
             label="Público"
             options={options.adsets}

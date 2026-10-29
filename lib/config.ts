@@ -33,19 +33,25 @@ export const COLORS = {
 } as const;
 
 /**
- * Classificação dos leads da aba "Leads":
- *  - Sem UTMs  → Campaign vazia
- *  - Tráfego   → Campaign preenchida E (Source é uma plataforma paga OU Medium indica mídia paga)
- *  - Orgânico  → Campaign preenchida que não se encaixa em tráfego pago
+ * Classificação dos leads da aba "Leads" (a lógica fica em lib/metrics.ts → buildClassifier):
+ *  - Sem UTMs  → nenhuma UTM preenchida
+ *  - Tráfego   → campanha, público (Medium) ou criativo (Content) existem na aba "Meta Ads",
+ *                OU Source é um código da Meta (PAID_SOURCES), OU Medium indica mídia paga
+ *  - Orgânico  → tem alguma UTM, mas não veio do tráfego
  * Ajuste as listas abaixo conforme o padrão de UTMs usado nas campanhas.
  */
-export const PAID_SOURCES = [
-  "fb",
-  "facebook",
-  "ig",
-  "instagram",
-  "meta",
-  "an",
-  "tiktok",
-];
+export const PAID_SOURCES = ["fb", "ig", "an", "msg"]; // códigos de posicionamento da Meta (já normalizados)
 export const PAID_MEDIUM_HINTS = ["cpc", "paid", "ppc", "cpm", "ads", "pago", "trafego", "tráfego"];
+
+/**
+ * Termos que, se aparecerem em QUALQUER parte do utm_source, classificam o lead como tráfego.
+ * Sem diferenciar maiúsculas/minúsculas nem acentos. Ex.: "quente" casa "Público_Quente", "quente-ig"…
+ */
+export const TRAFFIC_SOURCE_TERMS = ["quente", "frio"];
+
+/**
+ * false (padrão): os termos acima SOMAM-SE às outras regras (campanha/público/criativo da Meta,
+ *                 PAID_SOURCES, PAID_MEDIUM_HINTS).
+ * true: tráfego = SOMENTE leads cujo utm_source contém um dos termos acima.
+ */
+export const TRAFFIC_ONLY_BY_SOURCE_TERMS = false;

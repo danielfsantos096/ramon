@@ -9,14 +9,14 @@ import { DailyAreaChart } from "@/components/charts/daily-area-chart";
 import { HBarChart } from "@/components/charts/hbar-chart";
 import { COLORS } from "@/lib/config";
 import { formatBRL, formatInt } from "@/lib/format";
-import { countLeadsBy, delta, safeDiv } from "@/lib/metrics";
+import { countLeadsBy, delta } from "@/lib/metrics";
 
 function Leads() {
   const { summary: s, prevSummary: p, daily, slice, isLoading, data } = useDashboard();
   const loading = isLoading && !data;
 
-  const cplTotal = safeDiv(s.spend, s.leadsAC);
-  const cplTotalPrev = safeDiv(p.spend, p.leadsAC);
+  const cplTotal = s.cplAC;
+  const cplTotalPrev = p.cplAC;
   const empty = s.leadsAC === 0;
 
   const by = React.useMemo(

@@ -1,5 +1,5 @@
 import { NO_UTM } from "./parse";
-import { PAID_MEDIUM_HINTS, PAID_SOURCES, TIMEZONE } from "./config";
+import { PAID_MEDIUM_HINTS, PAID_SOURCES, TIMEZONE, TRAFFIC_ONLY_BY_SOURCE_TERMS, TRAFFIC_SOURCE_TERMS } from "./config";
 import type { AdRow, ApiData, LeadAgg } from "./types";
 
 /* ------------------------------------------------------------------ */
@@ -46,42 +46,89 @@ export function previousRange(from: string, to: string) {
 /* ------------------------------------------------------------------ */
 
 export interface Filters {
+  /** Campanhas da Meta (aba "Meta Ads") — usadas na Visão geral e no Meta Ads. */
   campaigns: string[];
+  /** Campanhas da aba "Leads" (coluna Campaign, valores exatos da planilha) — usadas na Análise de Leads. */
+  leadCampaigns: string[];
   adsets: string[]; // público
   ads: string[]; // criativo
   onlyNewLeads: boolean;
 }
 
-export const EMPTY_FILTERS: Filters = { campaigns: [], adsets: [], ads: [], onlyNewLeads: false };
+export const EMPTY_FILTERS: Filters = { campaigns: [], leadCampaigns: [], adsets: [], ads: [], onlyNewLeads: false };
 
 export function hasActiveFilters(f: Filters) {
-  return f.campaigns.length > 0 || f.adsets.length > 0 || f.ads.length > 0 || f.onlyNewLeads;
+  return f.campaigns.length > 0 || f.leadCampaigns.length > 0 || f.adsets.length > 0 || f.ads.length > 0 || f.onlyNewLeads;
 }
 
-const lc = (s: string) => s.trim().toLowerCase();
+/** Normaliza para comparação: decodifica URL ("+", %20), sem acento, minúsculo, espaços únicos. */
+export function normKey(v: string): string {
+  let s = String(v ?? "");
+  try {
+    s = decodeURIComponent(s.replace(/\+/g, " "));
+  } catch {
+    s = s.replace(/\+/g, " ");
+  }
+  return s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
-/** UTM pode vir como "nome" ou "nome|id": casa por igualdade ou prefixo "nome|". */
-function utmMatches(value: string, selected: string[]) {
-  const v = lc(value);
+/** Remove o ID que a Meta costuma acrescentar nas UTMs: "nome|1202345..." ou "nome - 1202345...". */
+function stripId(v: string): string {
+  return v.replace(/\s*[|_\-–:]\s*\d{6,}\s*$/, "").trim();
+}
+
+/** Chave de comparação entre nomes da Meta e valores de UTM. */
+export function utmKey(v: string): string {
+  return stripId(normKey(v));
+}
+
+/** UTM casa com o nome selecionado: igualdade normalizada (ignorando ID final) ou prefixo "nome|". */
+export function utmMatches(value: string, selected: string[]) {
+  const v = utmKey(value);
+  const raw = normKey(value);
   return selected.some((s) => {
-    const t = lc(s);
-    return v === t || v.startsWith(t + "|");
+    const t = utmKey(s);
+    return v === t || raw.startsWith(normKey(s) + "|");
   });
 }
+
+/** Campanha da Meta (nome) ↔ campanha da aba Leads (UTM): vale nos dois sentidos, ignorando ID final. */
+export function adCampaignMatchesLead(adCampaign: string, leadCampaigns: string[]) {
+  const a = normKey(adCampaign);
+  const ak = utmKey(adCampaign);
+  return leadCampaigns.some((l) => {
+    const lr = normKey(l);
+    return ak === utmKey(l) || lr.startsWith(a + "|") || a.startsWith(lr + "|");
+  });
+}
+
+export type Scope = "ads" | "leads";
 
 export interface Slice {
   ads: AdRow[];
   leads: LeadAgg[];
 }
 
-export function sliceData(data: ApiData, f: Filters, from: string, to: string): Slice {
+/**
+ * scope "ads"  (Visão geral / Meta Ads): campanha = nome da campanha da Meta.
+ * scope "leads" (Análise de Leads): campanha = valor exato da coluna Campaign da aba Leads;
+ *   o investimento considera as campanhas da Meta com o mesmo nome (para o CPL).
+ */
+export function sliceData(data: ApiData, f: Filters, from: string, to: string, scope: Scope = "ads"): Slice {
   const campaignSet = new Set(f.campaigns);
   const adsetSet = new Set(f.adsets);
   const adSet = new Set(f.ads);
+  const leadCampaignSet = new Set(f.leadCampaigns);
 
   const ads = data.ads.filter((r) => {
     if (r.date < from || r.date > to) return false;
-    if (campaignSet.size && !campaignSet.has(r.campaign)) return false;
+    if (scope === "ads" && campaignSet.size && !campaignSet.has(r.campaign)) return false;
+    if (scope === "leads" && f.leadCampaigns.length && !adCampaignMatchesLead(r.campaign, f.leadCampaigns)) return false;
     if (adsetSet.size && !adsetSet.has(r.adset)) return false;
     if (adSet.size && !adSet.has(r.ad)) return false;
     return true;
@@ -91,7 +138,9 @@ export function sliceData(data: ApiData, f: Filters, from: string, to: string): 
   const leads = data.leads.filter((l) => {
     if (l.date < from || l.date > to) return false;
     if (f.onlyNewLeads && l.old) return false;
-    if (f.campaigns.length && !utmMatches(l.campaign, f.campaigns)) return false;
+    if (scope === "leads") {
+      if (leadCampaignSet.size && !leadCampaignSet.has(l.campaign)) return false;
+    } else if (f.campaigns.length && !utmMatches(l.campaign, f.campaigns)) return false;
     if (f.adsets.length && !utmMatches(l.medium, f.adsets)) return false;
     if (f.ads.length && !utmMatches(l.content, f.ads)) return false;
     return true;
@@ -107,14 +156,41 @@ export function sliceData(data: ApiData, f: Filters, from: string, to: string): 
 export const safeDiv = (a: number, b: number): number | null => (b > 0 ? a / b : null);
 
 export type LeadClass = "traffic" | "organic" | "noutm";
+export type LeadClassifier = (l: Pick<LeadAgg, "campaign" | "source" | "medium" | "content" | "term">) => LeadClass;
 
-export function classifyLead(l: Pick<LeadAgg, "campaign" | "source" | "medium">): LeadClass {
-  if (l.campaign === NO_UTM) return "noutm";
-  const source = l.source.trim().toLowerCase();
-  const medium = l.medium.trim().toLowerCase();
-  if (PAID_SOURCES.includes(source)) return "traffic";
-  if (PAID_MEDIUM_HINTS.some((h) => medium.includes(h))) return "traffic";
-  return "organic";
+/**
+ * Classificação dos leads da aba "Leads":
+ *  - Sem UTMs : nenhuma UTM preenchida (campaign, source, medium, content e term vazios)
+ *  - Tráfego  : a UTM aponta para a mídia paga — campanha, público (medium) ou criativo (content)
+ *               existem na aba "Meta Ads" — ou o source é o código da Meta (fb, ig, an, msg)
+ *               ou o medium indica mídia paga (cpc, paid…). "instagram"/"facebook" por extenso
+ *               NÃO contam sozinhos (link da bio, post orgânico etc.)
+ *  - Orgânico : tem alguma UTM, mas não veio do tráfego
+ */
+export function buildClassifier(ads: AdRow[]): LeadClassifier {
+  const campaigns = new Set<string>();
+  const adsets = new Set<string>();
+  const adNames = new Set<string>();
+  for (const r of ads) {
+    campaigns.add(utmKey(r.campaign));
+    adsets.add(utmKey(r.adset));
+    adNames.add(utmKey(r.ad));
+  }
+  const known = (set: Set<string>, v: string) => v !== NO_UTM && set.has(utmKey(v));
+  const sourceTerms = TRAFFIC_SOURCE_TERMS.map(normKey).filter(Boolean);
+  const hasTerm = (source: string) => sourceTerms.some((t) => normKey(source).includes(t));
+
+  return (l) => {
+    if ([l.campaign, l.source, l.medium, l.content, l.term].every((v) => v === NO_UTM)) return "noutm";
+    if (TRAFFIC_ONLY_BY_SOURCE_TERMS && sourceTerms.length) return hasTerm(l.source) ? "traffic" : "organic";
+    if (hasTerm(l.source)) return "traffic";
+    if (known(campaigns, l.campaign) || known(adsets, l.medium) || known(adNames, l.content)) return "traffic";
+    const source = normKey(l.source);
+    const medium = normKey(l.medium);
+    if (PAID_SOURCES.includes(source)) return "traffic";
+    if (PAID_MEDIUM_HINTS.some((h) => medium.includes(h))) return "traffic";
+    return "organic";
+  };
 }
 
 export interface AdTotals {
@@ -167,13 +243,13 @@ export interface Summary {
   meta: AdTotals;
 }
 
-export function summarize(slice: Slice): Summary {
+export function summarize(slice: Slice, classify: LeadClassifier): Summary {
   const tm = totalsOf(slice.ads);
 
   let leadsAC = 0, withUtm = 0, noUtm = 0, paid = 0, organic = 0;
   for (const l of slice.leads) {
     leadsAC += l.count;
-    const c = classifyLead(l);
+    const c = classify(l);
     if (c === "noutm") noUtm += l.count;
     else withUtm += l.count;
     if (c === "traffic") paid += l.count;
@@ -189,9 +265,10 @@ export function summarize(slice: Slice): Summary {
     leadsNoUtm: noUtm,
     leadsPaid: paid,
     leadsOrganic: organic,
-    cplTraffic: safeDiv(tm.spend, leadsTraffic),
-    cplAC: safeDiv(tm.spend, leadsAC),
-    cplACUtm: safeDiv(tm.spend, withUtm),
+    // sem investimento no recorte não existe CPL (evita "R$ 0,00" enganoso)
+    cplTraffic: tm.spend > 0 ? safeDiv(tm.spend, leadsTraffic) : null,
+    cplAC: tm.spend > 0 ? safeDiv(tm.spend, leadsAC) : null,
+    cplACUtm: tm.spend > 0 ? safeDiv(tm.spend, withUtm) : null,
     meta: tm,
   };
 }
