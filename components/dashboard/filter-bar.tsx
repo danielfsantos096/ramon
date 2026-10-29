@@ -86,7 +86,7 @@ export function FilterBar() {
               counts={options.leadCampaignCounts}
               value={filters.leadCampaigns}
               onChange={(leadCampaigns) => setFilters({ leadCampaigns })}
-              hint="Campanhas (UTM Campaign) da aba Leads, com a contagem de linhas da planilha."
+              hint="Campanhas (UTM Campaign) do Leads Active, com a contagem de linhas da planilha."
             />
           ) : (
             <MultiSelect

@@ -273,6 +273,59 @@ export function summarize(slice: Slice, classify: LeadClassifier): Summary {
   };
 }
 
+/* ------------------------------------------------------------------ */
+/* Conferência: gerenciador (aba Meta Ads) × aba Leads                  */
+/* ------------------------------------------------------------------ */
+
+export type CrossDimension = "campaign" | "adset" | "ad";
+
+export interface CrossRow {
+  key: string;
+  meta: number; // Website Leads na aba Meta Ads
+  sheet: number; // linhas na aba Leads com a UTM correspondente
+  diff: number; // sheet − meta
+}
+
+export interface CrossCheck {
+  dimension: CrossDimension;
+  rows: CrossRow[];
+  total: { meta: number; sheet: number; diff: number };
+}
+
+/**
+ * Cruza, para o filtro mais específico ativo (criativo > público > campanha), os leads do
+ * gerenciador com os leads da aba Leads:
+ *   Campaign Name ↔ utm Campaign · Ad Set Name ↔ utm Medium · Ad Name ↔ utm Content
+ * Retorna null quando não há filtro de campanha/público/criativo.
+ * Os dois lados usam o mesmo período e os mesmos filtros (o slice já vem filtrado).
+ */
+export function crossCheck(slice: Slice, f: Filters): CrossCheck | null {
+  const dimension: CrossDimension | null = f.ads.length
+    ? "ad"
+    : f.adsets.length
+      ? "adset"
+      : f.campaigns.length
+        ? "campaign"
+        : null;
+  if (!dimension) return null;
+
+  const selected = dimension === "ad" ? f.ads : dimension === "adset" ? f.adsets : f.campaigns;
+  const utmField = dimension === "ad" ? "content" : dimension === "adset" ? "medium" : "campaign";
+
+  const rows: CrossRow[] = selected.map((key) => {
+    let meta = 0;
+    for (const r of slice.ads) if (r[dimension] === key) meta += r.leads;
+    let sheet = 0;
+    for (const l of slice.leads) if (utmMatches(l[utmField], [key])) sheet += l.count;
+    return { key, meta, sheet, diff: sheet - meta };
+  });
+  rows.sort((a, b) => b.meta - a.meta || b.sheet - a.sheet || a.key.localeCompare(b.key, "pt-BR"));
+
+  const meta = slice.ads.reduce((n, r) => n + r.leads, 0);
+  const sheet = slice.leads.reduce((n, l) => n + l.count, 0);
+  return { dimension, rows, total: { meta, sheet, diff: sheet - meta } };
+}
+
 /** Variação relativa (cur vs prev). null quando não comparável. */
 export function delta(cur: number | null, prev: number | null): number | null {
   if (cur === null || prev === null || prev === 0) return null;

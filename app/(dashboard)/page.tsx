@@ -1,6 +1,7 @@
 "use client";
 
 import { ChartCard } from "@/components/dashboard/chart-card";
+import { CrossCheckCard } from "@/components/dashboard/cross-check";
 import { useDashboard } from "@/components/dashboard/dashboard-provider";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { PageGate } from "@/components/dashboard/page-gate";
@@ -34,6 +35,8 @@ function Overview() {
           <KpiCard key={k.label} index={i} loading={loading} {...k} />
         ))}
       </section>
+
+      <CrossCheckCard />
 
       <ChartCard
         title="Evolução diária"
@@ -78,7 +81,7 @@ function Overview() {
       <ChartCard
         index={3}
         title="Leads diários"
-        description="Leads de tráfego (Meta Ads) x leads AC (aba Leads) por dia"
+        description="Leads de tráfego (Meta Ads) x leads AC (Leads Active) por dia"
         empty={s.leadsTraffic === 0 && s.leadsAC === 0}
       >
         <StackedDailyChart
