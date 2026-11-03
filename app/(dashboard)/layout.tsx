@@ -10,9 +10,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <FilterBar />
         {children}
       </main>
-      <footer className="mx-auto max-w-[1400px] px-4 pb-8 pt-2 text-center text-[11px] text-muted-foreground sm:px-6">
-        Dados da planilha Google Sheets · atualização automática a cada 5 minutos
-      </footer>
+      <div className="pb-8" />
     </DashboardProvider>
   );
 }
