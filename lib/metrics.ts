@@ -426,6 +426,21 @@ export function bestWorst(rows: GroupRow[]): { best: GroupRow | null; worst: Gro
   return { best, worst };
 }
 
+/**
+ * Ranking de criativos do MELHOR para o PIOR:
+ *  1) com leads, por menor CPL (empate: mais leads);
+ *  2) gastaram sem gerar leads, do menor para o maior gasto (o que mais gastou fica por último);
+ *  3) sem gasto e sem leads (não ranqueados) ficam no fim, fora do ranking.
+ */
+export function rankCreatives(rows: GroupRow[]): { ranked: GroupRow[]; unranked: GroupRow[] } {
+  const withLeads = rows
+    .filter((r) => r.leads > 0 && r.cpl !== null)
+    .sort((a, b) => a.cpl! - b.cpl! || b.leads - a.leads);
+  const noLeads = rows.filter((r) => r.spend > 0 && r.leads === 0).sort((a, b) => a.spend - b.spend);
+  const taken = new Set([...withLeads, ...noLeads]);
+  return { ranked: [...withLeads, ...noLeads], unranked: rows.filter((r) => !taken.has(r)) };
+}
+
 export function uniqueSorted(values: string[]): string[] {
   return [...new Set(values)].filter(Boolean).sort((a, b) => a.localeCompare(b, "pt-BR"));
 }

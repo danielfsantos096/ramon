@@ -10,7 +10,10 @@ import { DonutChart } from "@/components/charts/donut-chart";
 import { Funnel } from "@/components/charts/funnel";
 import { COLORS, META_COLOR } from "@/lib/config";
 import { formatBRL, formatInt, formatPct } from "@/lib/format";
-import { bestWorst, delta, groupMeta, totalsOf, type GroupRow } from "@/lib/metrics";
+import { ArrowUpDown, Trophy } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { bestWorst, delta, groupMeta, rankCreatives, totalsOf, type GroupRow } from "@/lib/metrics";
 
 const columns = (firstLabel: string): Column<GroupRow>[] => [
   { key: "key", label: firstLabel, value: (r) => r.key },
@@ -35,7 +38,17 @@ function MetaAds() {
   const byCampaign = React.useMemo(() => groupMeta(metaRows, "campaign"), [metaRows]);
   const byAdset = React.useMemo(() => groupMeta(metaRows, "adset"), [metaRows]);
   const byAd = React.useMemo(() => groupMeta(metaRows, "ad"), [metaRows]);
-  const { best, worst } = React.useMemo(() => bestWorst(byAd), [byAd]);
+  const { worst } = React.useMemo(() => bestWorst(byAd), [byAd]);
+
+  // Ranking de criativos (melhor → pior por CPL) + botão para inverter a ordem da tabela.
+  const [creativeOrder, setCreativeOrder] = React.useState<"best" | "worst">("best");
+  const { ranked, unranked } = React.useMemo(() => rankCreatives(byAd), [byAd]);
+  const top3 = React.useMemo(() => ranked.filter((r) => r.leads > 0).slice(0, 3), [ranked]);
+  const rankOf = React.useMemo(() => new Map(top3.map((r, i) => [r.key, i])), [top3]);
+  const creativeRows = React.useMemo(
+    () => (creativeOrder === "best" ? [...ranked, ...unranked] : [...ranked].reverse().concat(unranked)),
+    [ranked, unranked, creativeOrder]
+  );
 
   const empty = metaRows.length === 0;
 
@@ -107,21 +120,30 @@ function MetaAds() {
 
       <ChartCard
         title="Criativos"
-        description="Desempenho por anúncio · melhor e pior criativo destacados"
+        description="Desempenho por anúncio · 3 melhores e pior criativo destacados"
         empty={empty}
         index={6}
       >
-        {(best || worst) && (
-          <div className="mb-4 grid gap-3 sm:grid-cols-2">
-            {best && (
-              <div className="rounded-lg border border-success/40 bg-success/10 p-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-success">Melhor criativo · menor CPL</p>
-                <p className="mt-1 truncate text-sm font-medium" title={best.key}>{best.key}</p>
+        {(top3.length > 0 || worst) && (
+          <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {top3.map((c, i) => (
+              <div
+                key={c.key}
+                className={cn(
+                  "rounded-lg border p-3",
+                  i === 0 ? "border-success/60 bg-success/15 ring-1 ring-success/30" : "border-success/30 bg-success/5"
+                )}
+              >
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-success">
+                  <Trophy className="size-3.5" />
+                  {i + 1}º melhor criativo · {i === 0 ? "menor CPL" : "CPL"}
+                </p>
+                <p className="mt-1 truncate text-sm font-medium" title={c.key}>{c.key}</p>
                 <p className="text-xs text-muted-foreground tabular">
-                  CPL {formatBRL(best.cpl)} · {formatInt(best.leads)} leads · {formatBRL(best.spend)}
+                  CPL {formatBRL(c.cpl)} · {formatInt(c.leads)} leads · {formatBRL(c.spend)}
                 </p>
               </div>
-            )}
+            ))}
             {worst && (
               <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-destructive">
@@ -135,12 +157,27 @@ function MetaAds() {
             )}
           </div>
         )}
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">
+            Ranking por CPL · {creativeOrder === "best" ? "do melhor para o pior" : "do pior para o melhor"}
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCreativeOrder((o) => (o === "best" ? "worst" : "best"))}
+            aria-label="Inverter ordem de classificação dos criativos"
+          >
+            <ArrowUpDown className="size-3.5" />
+            {creativeOrder === "best" ? "Melhor → Pior" : "Pior → Melhor"}
+          </Button>
+        </div>
         <DataTable
-          rows={byAd}
+          key={creativeOrder}
+          rows={creativeRows}
           columns={columns("Criativo")}
           rowKey={(r) => r.key}
-          defaultSort={{ key: "leads", dir: "desc" }}
-          highlight={(r) => (best && r.key === best.key ? "best" : worst && r.key === worst.key ? "worst" : undefined)}
+          highlight={(r) => (rankOf.has(r.key) ? "best" : worst && r.key === worst.key ? "worst" : undefined)}
+          badgeLabel={(r, kind) => (kind === "best" ? `${(rankOf.get(r.key) ?? 0) + 1}º` : "Pior")}
         />
       </ChartCard>
     </>

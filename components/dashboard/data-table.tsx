@@ -24,6 +24,8 @@ interface Props<T> {
   rowKey: (row: T) => string;
   defaultSort?: { key: string; dir: "asc" | "desc" };
   highlight?: (row: T) => "best" | "worst" | undefined;
+  /** Texto do selo da linha destacada (padrão: "Melhor" / "Pior"). */
+  badgeLabel?: (row: T, kind: "best" | "worst") => string;
   pageSize?: number;
 }
 
@@ -32,7 +34,7 @@ function heatColor(t: number) {
   return `hsl(${Math.round(t * 120)} 65% 45% / 0.24)`;
 }
 
-export function DataTable<T>({ rows, columns, rowKey, defaultSort, highlight, pageSize = 15 }: Props<T>) {
+export function DataTable<T>({ rows, columns, rowKey, defaultSort, highlight, badgeLabel, pageSize = 15 }: Props<T>) {
   const [sort, setSort] = React.useState(defaultSort ?? null);
   const [limit, setLimit] = React.useState(pageSize);
 
@@ -139,8 +141,8 @@ export function DataTable<T>({ rows, columns, rowKey, defaultSort, highlight, pa
                           <span className="truncate" title={String(col.value(row) ?? "")}>
                             {col.render ? col.render(row) : String(col.value(row) ?? "—")}
                           </span>
-                          {hl === "best" && <Badge variant="success">Melhor</Badge>}
-                          {hl === "worst" && <Badge variant="destructive">Pior</Badge>}
+                          {hl === "best" && <Badge variant="success">{badgeLabel?.(row, "best") ?? "Melhor"}</Badge>}
+                          {hl === "worst" && <Badge variant="destructive">{badgeLabel?.(row, "worst") ?? "Pior"}</Badge>}
                         </span>
                       ) : col.render ? (
                         col.render(row)
