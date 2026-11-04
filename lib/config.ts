@@ -22,6 +22,9 @@ export const STAGE_TERMS = {
 /** Planilha de vendas "Ramon Souza - Vendas Gerais" (pode ser trocada pela variável SALES_SHEET_ID). */
 export const SALES_SHEET_ID_DEFAULT = "1xALGG-tMubq932JcanQpzrcN9uX4Rtz8ufYlcxXUHV0";
 
+/** Abertura do carrinho: a aba Hotmart começa neste dia (vendas anteriores não entram). */
+export const SALES_START = "2026-11-03";
+
 /** Produto das vendas exibido na aba Hotmart (nome exato, sem diferenciar maiúsculas/acentos). */
 export const SALES_PRODUCT = "TI TOTAL - Assinatura - Plataforma de Conteúdos";
 

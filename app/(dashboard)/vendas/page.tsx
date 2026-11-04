@@ -10,7 +10,7 @@ import { PageGate } from "@/components/dashboard/page-gate";
 import { DonutChart } from "@/components/charts/donut-chart";
 import { StackedDailyChart } from "@/components/charts/stacked-daily-chart";
 import { Card } from "@/components/ui/card";
-import { COLORS, META_COLOR, SALES_PRODUCT } from "@/lib/config";
+import { COLORS, META_COLOR, SALES_PRODUCT, SALES_START } from "@/lib/config";
 import { formatBRL, formatInt, formatPct } from "@/lib/format";
 import { delta, safeDiv } from "@/lib/metrics";
 import { NO_UTM } from "@/lib/parse";
@@ -42,7 +42,8 @@ function Sales() {
   const { data, range, prevRange, isLoading } = useDashboard();
   const loading = isLoading && !data;
 
-  const sales = React.useMemo(() => data?.sales ?? [], [data?.sales]);
+  // só vendas a partir da abertura do carrinho
+  const sales = React.useMemo(() => (data?.sales ?? []).filter((x) => x.date >= SALES_START), [data?.sales]);
   const cur = React.useMemo(() => salesInRange(sales, range.from, range.to), [sales, range]);
   const prev = React.useMemo(() => salesInRange(sales, prevRange.from, prevRange.to), [sales, prevRange]);
   const s = React.useMemo(() => summarizeSales(cur), [cur]);

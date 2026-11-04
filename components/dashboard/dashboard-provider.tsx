@@ -3,7 +3,7 @@
 import * as React from "react";
 import useSWR from "swr";
 import { usePathname } from "next/navigation";
-import { REFRESH_MS } from "@/lib/config";
+import { REFRESH_MS, SALES_START } from "@/lib/config";
 import {
   EMPTY_FILTERS,
   buildClassifier,
@@ -154,9 +154,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   );
   const stages = React.useMemo(() => stageRanges(raw.ads, today), [raw.ads, today]);
 
-  // Padrão: do primeiro ao último dia de cada etapa (vendas: do início da captação até hoje).
+  // Padrão: do primeiro ao último dia de cada etapa (vendas: da abertura do carrinho até hoje).
   const defaultRange = React.useMemo(() => {
-    if (view === "sales") return { from: raw.campaignStart ?? today, to: today };
+    if (view === "sales") return { from: SALES_START, to: today > SALES_START ? today : SALES_START };
     if (view === "capt") return { from: raw.campaignStart ?? stages.capt?.from ?? today, to: stages.capt?.to ?? today };
     const st = stages[view];
     return { from: st?.from ?? today, to: st?.to ?? today };

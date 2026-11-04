@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { addDays, hasActiveFilters } from "@/lib/metrics";
 import { cn } from "@/lib/utils";
+import { SALES_START } from "@/lib/config";
 import { STAGE_LABEL } from "@/lib/stage";
 import { useDashboard } from "./dashboard-provider";
 import { MultiSelect } from "./multi-select";
@@ -24,7 +25,7 @@ export function FilterBar() {
   const [open, setOpen] = React.useState(false);
 
   const active = hasActiveFilters(filters) || rangeIsCustom;
-  const min = data?.campaignStart ?? undefined;
+  const min = view === "sales" ? SALES_START : (data?.campaignStart ?? undefined);
 
   const isSales = view === "sales";
   const fmt = (iso: string) => iso.split("-").reverse().join("/");
@@ -144,7 +145,7 @@ export function FilterBar() {
       {(stageInfo || isSales) && (
         <p className="mt-3 text-xs text-muted-foreground">
           {isSales ? (
-            <>Período padrão: início da captação até hoje.</>
+            <>Período padrão: {fmt(SALES_START)} (abertura do carrinho) até hoje.</>
           ) : stageInfo ? (
             <>
               <span className="font-medium text-foreground">
