@@ -1,6 +1,6 @@
 import { NO_UTM } from "./parse";
 import { PAID_MEDIUM_HINTS, PAID_SOURCES, TIMEZONE, TRAFFIC_ONLY_BY_SOURCE_TERMS, TRAFFIC_SOURCE_TERMS } from "./config";
-import type { AdRow, ApiData, LeadAgg } from "./types";
+import type { AdRow, ApiData, LeadAgg, Stage } from "./types";
 
 /* ------------------------------------------------------------------ */
 /* Datas                                                               */
@@ -443,4 +443,41 @@ export function rankCreatives(rows: GroupRow[]): { ranked: GroupRow[]; unranked:
 
 export function uniqueSorted(values: string[]): string[] {
   return [...new Set(values)].filter(Boolean).sort((a, b) => a.localeCompare(b, "pt-BR"));
+}
+
+/* ------------------------------------------------------------------ */
+/* Etapas (Captação / Avisos / RMKT) e suas datas                      */
+/* ------------------------------------------------------------------ */
+
+export interface StageRange {
+  from: string;
+  to: string;
+  /** true = ainda rodando (teve investimento ontem/hoje); o fim vira "hoje". */
+  ongoing: boolean;
+}
+
+/**
+ * Datas de cada etapa: do primeiro ao último dia com investimento nas campanhas da etapa.
+ * Se o último dia é ontem/hoje, a etapa está em andamento e o fim é hoje.
+ */
+export function stageRanges(ads: AdRow[], today: string): Record<Stage, StageRange | null> {
+  const out: Record<Stage, StageRange | null> = { capt: null, avisos: null, rmkt: null };
+  for (const r of ads) {
+    if (r.spend <= 0) continue;
+    const cur = out[r.stage];
+    if (!cur) out[r.stage] = { from: r.date, to: r.date, ongoing: false };
+    else {
+      if (r.date < cur.from) cur.from = r.date;
+      if (r.date > cur.to) cur.to = r.date;
+    }
+  }
+  for (const k of Object.keys(out) as Stage[]) {
+    const s = out[k];
+    if (!s) continue;
+    if (s.to >= addDays(today, -1)) {
+      s.ongoing = true;
+      s.to = today;
+    }
+  }
+  return out;
 }

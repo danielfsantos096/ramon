@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { addDays, hasActiveFilters } from "@/lib/metrics";
 import { cn } from "@/lib/utils";
+import { STAGE_LABEL } from "@/lib/stage";
 import { useDashboard } from "./dashboard-provider";
 import { MultiSelect } from "./multi-select";
 
@@ -18,12 +19,16 @@ const PRESETS = [
 export function FilterBar() {
   const {
     range, setRange, resetRange, rangeIsCustom, today,
-    filters, setFilters, clearFilters, options, data, scope,
+    filters, setFilters, clearFilters, options, data, scope, view, stages,
   } = useDashboard();
   const [open, setOpen] = React.useState(false);
 
   const active = hasActiveFilters(filters) || rangeIsCustom;
   const min = data?.campaignStart ?? undefined;
+
+  const isSales = view === "sales";
+  const fmt = (iso: string) => iso.split("-").reverse().join("/");
+  const stageInfo = !isSales ? stages[view] : null;
 
   const applyPreset = (days: number) => setRange(addDays(today, -(days - 1)), today);
 
@@ -76,9 +81,9 @@ export function FilterBar() {
           </Button>
         </div>
 
-        <div className="hidden h-9 w-px bg-border sm:block" />
+        {!isSales && <div className="hidden h-9 w-px bg-border sm:block" />}
 
-        <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+        <div className={cn(isSales ? "hidden" : "grid grid-cols-1 gap-2 sm:flex sm:flex-wrap")}>
           {scope === "leads" ? (
             <MultiSelect
               label="Campanha"
@@ -112,7 +117,7 @@ export function FilterBar() {
           />
         </div>
 
-        <label className="flex h-9 cursor-pointer items-center gap-2 text-sm">
+        <label className={cn("h-9 cursor-pointer items-center gap-2 text-sm", isSales || view !== "capt" ? "hidden" : "flex")}>
           <input
             type="checkbox"
             checked={filters.onlyNewLeads}
@@ -136,6 +141,20 @@ export function FilterBar() {
           </Button>
         )}
       </div>
+      {(stageInfo || isSales) && (
+        <p className="mt-3 text-xs text-muted-foreground">
+          {isSales ? (
+            <>Período padrão: início da captação até hoje.</>
+          ) : stageInfo ? (
+            <>
+              <span className="font-medium text-foreground">
+                {view === "capt" ? "Captação" : STAGE_LABEL[view]}
+              </span>
+              : {fmt(stageInfo.from)} → {fmt(stageInfo.to)} · {stageInfo.ongoing ? "em andamento" : "encerrada"} (período padrão desta aba)
+            </>
+          ) : null}
+        </p>
+      )}
     </div>
   );
 }

@@ -1,6 +1,10 @@
+/** Etapa da campanha: Captação, Avisos ou RMKT (definida pelo nome da campanha, ver STAGE_TERMS). */
+export type Stage = "capt" | "avisos" | "rmkt";
+
 /** Linha normalizada da aba "Meta Ads" (uma por dia/campanha/público/anúncio). */
 export interface AdRow {
   date: string; // ISO yyyy-mm-dd
+  stage: Stage;
   campaign: string;
   adset: string;
   ad: string;
@@ -28,12 +32,36 @@ export interface LeadAgg {
   count: number;
 }
 
+/**
+ * Vendas da Hotmart já AGREGADAS (contagem/valores por dia + status + pagamento + oferta + UTMs).
+ * Nome, e-mail e telefone do comprador nunca são lidos.
+ */
+export interface SaleAgg {
+  date: string; // ISO yyyy-mm-dd
+  status: string; // COMPLETED, APPROVED, REFUNDED…
+  payment: string; // CREDIT_CARD, PIX…
+  offer: string; // Código da oferta
+  installments: number;
+  source: string; // utm_source ("Sem UTM" quando vazio)
+  medium: string;
+  campaign: string;
+  term: string;
+  content: string;
+  count: number;
+  gross: number; // soma de Valor Bruto
+  commission: number; // soma de Comissão
+}
+
 export interface ApiData {
   generatedAt: string; // ISO datetime do servidor
   campaignStart: string | null; // menor data encontrada (ou CAMPAIGN_START)
   lastDate: string | null;
   ads: AdRow[];
   leads: LeadAgg[];
+  /** Vendas do produto configurado em SALES_PRODUCT (aba Hotmart). */
+  sales: SaleAgg[];
+  /** Preenchido quando a aba de vendas não pôde ser lida (o resto do dashboard segue funcionando). */
+  salesError?: string;
   warnings: string[];
   demo?: boolean;
 }

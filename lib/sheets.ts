@@ -1,8 +1,8 @@
 import "server-only";
 import { google } from "googleapis";
-import { SHEET_TABS } from "./config";
-import { parseLeads, parseMeta, type Row } from "./normalize";
-import type { ApiData } from "./types";
+import { SALES_SHEET_ID_DEFAULT, SHEET_TABS } from "./config";
+import { parseLeads, parseMeta, parseSales, type Row } from "./normalize";
+import type { ApiData, SaleAgg } from "./types";
 import { demoData } from "./demo";
 
 export class ConfigError extends Error {}
@@ -63,18 +63,54 @@ export async function loadData(): Promise<ApiData> {
 
   const ads = parseMeta(metaRows, warnings);
   const leads = parseLeads(leadRows, warnings);
+  const { sales, salesError } = await loadSales(warnings);
 
   const dates = [...ads.map((a) => a.date), ...leads.map((l) => l.date)].sort();
+  // Início da captação = primeiro dia com investimento nas campanhas de captação
+  const captDates = ads.filter((a) => a.stage === "capt" && a.spend > 0).map((a) => a.date).sort();
   const override = process.env.CAMPAIGN_START && /^\d{4}-\d{2}-\d{2}$/.test(process.env.CAMPAIGN_START)
     ? process.env.CAMPAIGN_START
     : null;
 
   return {
     generatedAt: new Date().toISOString(),
-    campaignStart: override ?? dates[0] ?? null,
+    campaignStart: override ?? captDates[0] ?? dates[0] ?? null,
     lastDate: dates[dates.length - 1] ?? null,
     ads,
     leads,
+    sales,
+    salesError,
     warnings,
   };
+}
+
+/**
+ * Vendas: planilha separada ("Ramon Souza - Vendas Gerais", variável SALES_SHEET_ID), aba "Hotmart".
+ * Lê só A:B e F:W — Nome, Email e Telefone (C:E) nunca saem da planilha.
+ * Se falhar (sem permissão, ID ausente), o restante do dashboard continua funcionando.
+ */
+async function loadSales(warnings: string[]): Promise<{ sales: SaleAgg[]; salesError?: string }> {
+  const salesId = process.env.SALES_SHEET_ID || SALES_SHEET_ID_DEFAULT;
+  try {
+    const { sheets } = getClient();
+    const tab = SHEET_TABS.sales;
+    const [left, right] = await Promise.all([
+      readRange(sheets, salesId, `'${tab}'!A1:B`),
+      readRange(sheets, salesId, `'${tab}'!F1:W`),
+    ]);
+    const n = Math.max(left.length, right.length);
+    const merged: Row[] = [];
+    for (let i = 0; i < n; i++) {
+      const l = left[i] ?? [];
+      merged.push([l[0] ?? "", l[1] ?? "", ...(right[i] ?? [])]);
+    }
+    return { sales: parseSales(merged, warnings) };
+  } catch (e) {
+    console.error("[sales]", e instanceof Error ? e.message : e);
+    return {
+      sales: [],
+      salesError:
+        "Não foi possível ler a aba Hotmart. Confira SALES_SHEET_ID e se a planilha de vendas foi compartilhada com a Service Account.",
+    };
+  }
 }

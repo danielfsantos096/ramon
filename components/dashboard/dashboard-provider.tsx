@@ -9,6 +9,7 @@ import {
   buildClassifier,
   dailySeries,
   previousRange,
+  stageRanges,
   sliceData,
   summarize,
   todayISO,
@@ -18,9 +19,20 @@ import {
   type Filters,
   type Scope,
   type Slice,
+  type StageRange,
   type Summary,
 } from "@/lib/metrics";
-import type { ApiData } from "@/lib/types";
+import type { ApiData, Stage } from "@/lib/types";
+
+/** Página atual: uma das etapas da Meta ou a aba de vendas. */
+export type View = Stage | "sales";
+
+function viewOf(pathname: string | null): View {
+  if (pathname?.startsWith("/avisos")) return "avisos";
+  if (pathname?.startsWith("/rmkt")) return "rmkt";
+  if (pathname?.startsWith("/vendas")) return "sales";
+  return "capt"; // Visão geral, Captação (/meta-ads) e Análise de Leads
+}
 
 class FetchError extends Error {
   code?: string;
@@ -54,6 +66,7 @@ const EMPTY_DATA: ApiData = {
   lastDate: null,
   ads: [],
   leads: [],
+  sales: [],
   warnings: [],
 };
 
@@ -64,6 +77,10 @@ interface Ctx {
   isValidating: boolean;
   refresh: () => void;
   today: string;
+  /** Página atual (etapa da Meta ou vendas). */
+  view: View;
+  /** Datas de cada etapa (primeiro ao último dia com investimento). */
+  stages: Record<Stage, StageRange | null>;
 
   range: { from: string; to: string };
   prevRange: { from: string; to: string };
@@ -127,14 +144,36 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [toOverride, setToOverride] = React.useState<string | null>(null);
   const [filters, setFiltersState] = React.useState<Filters>(EMPTY_FILTERS);
 
-  const d = data ?? EMPTY_DATA;
+  const view = viewOf(pathname);
+  const raw = data ?? EMPTY_DATA;
 
-  // Padrão: do início da captação até hoje.
+  // Cada página só enxerga as campanhas da sua etapa (Captação, Avisos ou RMKT).
+  const d = React.useMemo<ApiData>(
+    () => (view === "sales" ? raw : { ...raw, ads: raw.ads.filter((r) => r.stage === view) }),
+    [raw, view]
+  );
+  const stages = React.useMemo(() => stageRanges(raw.ads, today), [raw.ads, today]);
+
+  // Padrão: do primeiro ao último dia de cada etapa (vendas: do início da captação até hoje).
+  const defaultRange = React.useMemo(() => {
+    if (view === "sales") return { from: raw.campaignStart ?? today, to: today };
+    if (view === "capt") return { from: raw.campaignStart ?? stages.capt?.from ?? today, to: stages.capt?.to ?? today };
+    const st = stages[view];
+    return { from: st?.from ?? today, to: st?.to ?? today };
+  }, [view, raw.campaignStart, stages, today]);
+
+  // Ao trocar de etapa, volta para as datas dela e limpa os filtros (os nomes de campanha são outros).
+  React.useEffect(() => {
+    setFromOverride(null);
+    setToOverride(null);
+    setFiltersState(EMPTY_FILTERS);
+  }, [view]);
+
   const range = React.useMemo(() => {
-    const from = fromOverride ?? d.campaignStart ?? today;
-    const to = toOverride ?? today;
+    const from = fromOverride ?? defaultRange.from;
+    const to = toOverride ?? defaultRange.to;
     return from <= to ? { from, to } : { from: to, to: from };
-  }, [fromOverride, toOverride, d.campaignStart, today]);
+  }, [fromOverride, toOverride, defaultRange]);
 
   const prevRange = React.useMemo(() => previousRange(range.from, range.to), [range]);
 
@@ -156,7 +195,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   }, []);
   const clearFilters = React.useCallback(() => setFiltersState(EMPTY_FILTERS), []);
 
-  const classify = React.useMemo(() => buildClassifier(d.ads), [d.ads]);
+  // Os leads da aba Leads são da captação: a classificação usa só as campanhas de captação.
+  const classify = React.useMemo(() => buildClassifier(raw.ads.filter((r) => r.stage === "capt")), [raw.ads]);
 
   const options = React.useMemo(() => {
     // Opções de público/criativo respeitam a campanha escolhida (quando há correspondência).
@@ -207,6 +247,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       isValidating,
       refresh: () => void mutate(),
       today,
+      view,
+      stages,
       range,
       prevRange,
       rangeIsCustom: fromOverride !== null || toOverride !== null,
@@ -224,7 +266,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       daily,
     }),
     [
-      data, error, isLoading, isValidating, mutate, today, range, prevRange, fromOverride, toOverride,
+      data, error, isLoading, isValidating, mutate, today, view, stages, range, prevRange, fromOverride, toOverride,
       setRange, resetRange, filters, setFilters, clearFilters, scope, options, slice, prevSlice, summary, prevSummary, daily,
     ]
   );

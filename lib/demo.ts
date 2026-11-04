@@ -1,4 +1,5 @@
-import type { AdRow, ApiData, LeadAgg } from "./types";
+import { stageOf } from "./stage";
+import type { AdRow, ApiData, LeadAgg, SaleAgg } from "./types";
 
 /** Dados fictícios determinísticos — ative com DEMO_MODE=true para pré-visualizar sem credenciais. */
 function rng(seed: number) {
@@ -32,7 +33,8 @@ export function demoData(): ApiData {
     const date = iso(d);
     const ramp = 0.6 + (d.getTime() - start.getTime()) / (end.getTime() - start.getTime());
 
-    campaigns.forEach((campaign, ci) => {
+    const inCapt = d.getTime() <= end.getTime() - 8 * 86400000;
+    (inCapt ? campaigns : []).forEach((campaign, ci) => {
       adsets.forEach((adset, si) => {
         ads.forEach((ad, ai) => {
           const quality = 0.6 + rand() * 0.9;
@@ -42,7 +44,7 @@ export function demoData(): ApiData {
           const lpv = Math.round(clicks * (0.72 + rand() * 0.18));
           const l = Math.round(lpv * (0.18 + rand() * 0.14) * quality);
           rows.push({
-            date, campaign, adset, ad,
+            date, stage: stageOf(campaign), campaign, adset, ad,
             spend: +spend.toFixed(2),
             reach: Math.round(impressions * 0.7),
             impressions, clicks, lpv, leads: l,
@@ -84,6 +86,55 @@ export function demoData(): ApiData {
     }
   }
 
+  // Avisos (últimos 7 dias, terminam há 2 dias) e RMKT (últimos 5 dias, em andamento)
+  const extra: [string, number, number][] = [["BF2026 | Avisos | Lista", 7, 2], ["BF2026 | RMKT | Vendas", 5, 0]];
+  for (const [campaign, from, to] of extra) {
+    for (let k = from; k >= to; k--) {
+      const dt = new Date(end);
+      dt.setUTCDate(dt.getUTCDate() - k);
+      for (const adset of ["Leads quentes", "Visitantes LP 14d"]) {
+        for (const ad of ["Aviso 01 - Vídeo", "Aviso 02 - Estático", "Aviso 03 - Depoimento"]) {
+          const spend = 20 + rand() * 40;
+          const impressions = Math.round(spend * (80 + rand() * 50));
+          const clicks = Math.round(impressions * (0.01 + rand() * 0.02));
+          rows.push({
+            date: iso(dt), stage: stageOf(campaign), campaign, adset, ad,
+            spend: +spend.toFixed(2), reach: Math.round(impressions * 0.6), impressions, clicks,
+            lpv: Math.round(clicks * (0.7 + rand() * 0.2)), leads: 0,
+          });
+        }
+      }
+    }
+  }
+
+  // Vendas (Hotmart) a partir do fim da captação
+  const sales: SaleAgg[] = [];
+  const payments = ["CREDIT_CARD", "CREDIT_CARD", "PIX", "PIX", "WALLET", "BILLET"];
+  const utms: [string, string, string, string][] = [
+    ["quente", "Leads quentes", "RMKT | Vendas", "Aviso 01 - Vídeo"],
+    ["quente", "Visitantes LP 14d", "RMKT | Vendas", "Aviso 02 - Estático"],
+    ["frio", "Lookalike 1%", "BF2026 | Captação | Frio", "Criativo 01 - Vídeo"],
+    ["Sem UTM", "Sem UTM", "Sem UTM", "Sem UTM"],
+  ];
+  for (let k = 10; k >= 0; k--) {
+    const dt = new Date(end);
+    dt.setUTCDate(dt.getUTCDate() - k);
+    const n = Math.round(1 + rand() * 7);
+    for (let i = 0; i < n; i++) {
+      const u = utms[Math.floor(rand() * utms.length)];
+      const r = rand();
+      const gross = r > 0.7 ? 747 : 497;
+      sales.push({
+        date: iso(dt),
+        status: r > 0.93 ? "REFUNDED" : r > 0.88 ? "CANCELED" : r > 0.6 ? "APPROVED" : "COMPLETED",
+        payment: payments[Math.floor(rand() * payments.length)],
+        offer: "ieg0jgxq", installments: 1 + Math.floor(rand() * 12),
+        source: u[0], medium: u[1], campaign: u[2], term: "Instagram_Stories", content: u[3],
+        count: 1, gross, commission: +(gross * 0.87).toFixed(2),
+      });
+    }
+  }
+
   // agrega leads idênticos
   const agg = new Map<string, LeadAgg>();
   for (const l of leads) {
@@ -99,6 +150,7 @@ export function demoData(): ApiData {
     lastDate: iso(end),
     ads: rows,
     leads: [...agg.values()],
+    sales,
     warnings: [],
     demo: true,
   };

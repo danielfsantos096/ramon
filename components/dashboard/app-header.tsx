@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Megaphone, Users } from "lucide-react";
+import { BarChart3, Bell, Megaphone, Repeat2, ShoppingCart, Users } from "lucide-react";
 import { CAMPAIGN_TITLE } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "./theme-toggle";
@@ -10,7 +10,10 @@ import { UpdatedBadge } from "./updated-badge";
 
 const NAV = [
   { href: "/", label: "Visão geral", icon: BarChart3 },
-  { href: "/meta-ads", label: "Meta Ads", icon: Megaphone },
+  { href: "/meta-ads", label: "Captação", icon: Megaphone },
+  { href: "/avisos", label: "Avisos", icon: Bell },
+  { href: "/rmkt", label: "RMKT", icon: Repeat2 },
+  { href: "/vendas", label: "Hotmart", icon: ShoppingCart },
   { href: "/leads", label: "Análise de Leads", icon: Users },
 ] as const;
 

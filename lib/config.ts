@@ -6,7 +6,29 @@ export const REFRESH_MS = 5 * 60 * 1000;
 export const SHEET_TABS = {
   meta: "Meta Ads",
   leads: "Leads",
+  /** Aba de vendas da Hotmart na planilha "Ramon Souza - Vendas Gerais". */
+  sales: "Hotmart",
 } as const;
+
+/**
+ * Etapas das campanhas da aba "Meta Ads", identificadas pelo NOME DA CAMPANHA
+ * (sem diferenciar maiúsculas/minúsculas nem acentos). O que não casar com nenhum termo é Captação.
+ */
+export const STAGE_TERMS = {
+  avisos: ["avisos"],
+  rmkt: ["rmkt"],
+} as const;
+
+/** Planilha de vendas "Ramon Souza - Vendas Gerais" (pode ser trocada pela variável SALES_SHEET_ID). */
+export const SALES_SHEET_ID_DEFAULT = "1xALGG-tMubq932JcanQpzrcN9uX4Rtz8ufYlcxXUHV0";
+
+/** Produto das vendas exibido na aba Hotmart (nome exato, sem diferenciar maiúsculas/acentos). */
+export const SALES_PRODUCT = "TI TOTAL - Assinatura - Plataforma de Conteúdos";
+
+/** Status da Hotmart que contam como venda. Reembolso, chargeback e cancelamento ficam de fora. */
+export const SALES_PAID_STATUSES = ["COMPLETED", "APPROVED"];
+/** Status exibidos como "devoluções" (reembolso/chargeback/disputa). */
+export const SALES_REFUND_STATUSES = ["REFUNDED", "CHARGEBACK", "DISPUTE", "PARTIALLY_REFUNDED"];
 
 /** Cor da Meta (azul). */
 export const META_COLOR = "#1877F2";
