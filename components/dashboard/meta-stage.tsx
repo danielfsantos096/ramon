@@ -19,28 +19,52 @@ import { cn } from "@/lib/utils";
 
 /**
  * Captação e etapas com leads: resultado = Website Leads (CPL).
- * Avisos/RMKT sem leads na aba Meta Ads: resultado = visualizações da página de destino (custo por LPV).
+ * Avisos sem leads na aba Meta Ads: resultado = visualizações da página de destino (custo por LPV).
+ * RMKT (vendas): resultado = Website Purchases (CPA e ROAS) — nenhuma informação de lead.
  */
-type Mode = "leads" | "lpv";
+type Mode = "leads" | "lpv" | "sales";
 
 const costPerLpv = (r: GroupRow) => safeDiv(r.spend, r.lpv);
 
-const columns = (firstLabel: string, mode: Mode): Column<GroupRow>[] => [
-  { key: "key", label: firstLabel, value: (r) => r.key },
-  mode === "leads"
-    ? { key: "leads", label: "Leads", align: "right", value: (r) => r.leads, render: (r) => formatInt(r.leads), heat: "high-good" }
-    : { key: "lpv", label: "Visual. da página", align: "right", value: (r) => r.lpv, render: (r) => formatInt(r.lpv), heat: "high-good" },
-  { key: "spend", label: "Valor", align: "right", value: (r) => r.spend, render: (r) => formatBRL(r.spend) },
-  mode === "leads"
-    ? { key: "cpl", label: "CPL", align: "right", value: (r) => r.cpl, render: (r) => formatBRL(r.cpl), heat: "low-good" }
-    : { key: "cplpv", label: "Custo/visual.", align: "right", value: costPerLpv, render: (r) => formatBRL(costPerLpv(r)), heat: "low-good" },
-  { key: "clicks", label: "Cliques", align: "right", value: (r) => r.clicks, render: (r) => formatInt(r.clicks) },
-  { key: "ctr", label: "CTR", align: "right", value: (r) => r.ctr, render: (r) => formatPct(r.ctr) },
-  { key: "cpc", label: "CPC", align: "right", value: (r) => r.cpc, render: (r) => formatBRL(r.cpc) },
-  mode === "leads"
-    ? { key: "convRate", label: "Tx. conversão", align: "right", value: (r) => r.convRate, render: (r) => formatPct(r.convRate) }
-    : { key: "loadRate", label: "Tx. carregamento", align: "right", value: (r) => r.loadRate, render: (r) => formatPct(r.loadRate) },
-];
+const columns = (firstLabel: string, mode: Mode): Column<GroupRow>[] => {
+  const first: Column<GroupRow> = { key: "key", label: firstLabel, value: (r) => r.key };
+  const spend: Column<GroupRow> = { key: "spend", label: "Valor", align: "right", value: (r) => r.spend, render: (r) => formatBRL(r.spend) };
+  const clicks: Column<GroupRow> = { key: "clicks", label: "Cliques", align: "right", value: (r) => r.clicks, render: (r) => formatInt(r.clicks) };
+  const ctr: Column<GroupRow> = { key: "ctr", label: "CTR", align: "right", value: (r) => r.ctr, render: (r) => formatPct(r.ctr) };
+  const cpc: Column<GroupRow> = { key: "cpc", label: "CPC", align: "right", value: (r) => r.cpc, render: (r) => formatBRL(r.cpc) };
+
+  if (mode === "sales") {
+    return [
+      first,
+      { key: "purchases", label: "Compras", align: "right", value: (r) => r.purchases, render: (r) => formatInt(r.purchases), heat: "high-good" },
+      spend,
+      { key: "cpa", label: "CPA", align: "right", value: (r) => r.cpa, render: (r) => formatBRL(r.cpa), heat: "low-good" },
+      { key: "purchaseValue", label: "Valor de conversão", align: "right", value: (r) => r.purchaseValue, render: (r) => formatBRL(r.purchaseValue) },
+      { key: "roas", label: "ROAS", align: "right", value: (r) => r.roas, render: (r) => fmtRoas(r.roas), heat: "high-good" },
+      { key: "checkouts", label: "Checkouts", align: "right", value: (r) => r.checkouts, render: (r) => formatInt(r.checkouts) },
+      clicks,
+      ctr,
+    ];
+  }
+  return [
+    first,
+    mode === "leads"
+      ? { key: "leads", label: "Leads", align: "right", value: (r) => r.leads, render: (r) => formatInt(r.leads), heat: "high-good" }
+      : { key: "lpv", label: "Visual. da página", align: "right", value: (r) => r.lpv, render: (r) => formatInt(r.lpv), heat: "high-good" },
+    spend,
+    mode === "leads"
+      ? { key: "cpl", label: "CPL", align: "right", value: (r) => r.cpl, render: (r) => formatBRL(r.cpl), heat: "low-good" }
+      : { key: "cplpv", label: "Custo/visual.", align: "right", value: costPerLpv, render: (r) => formatBRL(costPerLpv(r)), heat: "low-good" },
+    clicks,
+    ctr,
+    cpc,
+    mode === "leads"
+      ? { key: "convRate", label: "Tx. conversão", align: "right", value: (r) => r.convRate, render: (r) => formatPct(r.convRate) }
+      : { key: "loadRate", label: "Tx. carregamento", align: "right", value: (r) => r.loadRate, render: (r) => formatPct(r.loadRate) },
+  ];
+};
+
+const fmtRoas = (v: number | null) => (v === null ? "—" : v.toFixed(2).replace(".", ",") + "x");
 
 function MetaStage({ stage }: { stage: Stage }) {
   const { slice, prevSlice, isLoading, data } = useDashboard();
@@ -49,7 +73,7 @@ function MetaStage({ stage }: { stage: Stage }) {
   const metaRows = slice.ads;
   const t = React.useMemo(() => totalsOf(metaRows), [metaRows]);
   const p = React.useMemo(() => totalsOf(prevSlice.ads), [prevSlice.ads]);
-  const mode: Mode = stage === "capt" || t.leads > 0 || p.leads > 0 ? "leads" : "lpv";
+  const mode: Mode = stage === "rmkt" ? "sales" : stage === "capt" || t.leads > 0 || p.leads > 0 ? "leads" : "lpv";
   const label = STAGE_LABEL[stage];
 
   const byCampaign = React.useMemo(() => groupMeta(metaRows, "campaign"), [metaRows]);
@@ -59,7 +83,12 @@ function MetaStage({ stage }: { stage: Stage }) {
   // Ranking de criativos (melhor → pior) + botão para inverter a ordem da tabela.
   // No modo "lpv" o resultado é a visualização da página e o custo é o custo por visualização.
   const rankInput = React.useMemo(
-    () => (mode === "leads" ? byAd : byAd.map((r) => ({ ...r, leads: r.lpv, cpl: costPerLpv(r) }))),
+    () =>
+      mode === "leads"
+        ? byAd
+        : mode === "sales"
+          ? byAd.map((r) => ({ ...r, leads: r.purchases, cpl: r.cpa }))
+          : byAd.map((r) => ({ ...r, leads: r.lpv, cpl: costPerLpv(r) })),
     [byAd, mode]
   );
   const { worst: worstRaw } = React.useMemo(() => bestWorst(rankInput), [rankInput]);
@@ -73,8 +102,8 @@ function MetaStage({ stage }: { stage: Stage }) {
     () => (creativeOrder === "best" ? [...ranked, ...unranked] : [...ranked].reverse().concat(unranked)),
     [ranked, unranked, creativeOrder]
   );
-  const costName = mode === "leads" ? "CPL" : "Custo/visualização";
-  const unitName = mode === "leads" ? "leads" : "visualizações";
+  const costName = mode === "leads" ? "CPL" : mode === "sales" ? "CPA" : "Custo/visualização";
+  const unitName = mode === "leads" ? "leads" : mode === "sales" ? "compras" : "visualizações";
 
   const empty = metaRows.length === 0;
 
@@ -89,24 +118,36 @@ function MetaStage({ stage }: { stage: Stage }) {
   const cpLpv = safeDiv(t.spend, t.lpv);
   const cpLpvPrev = safeDiv(p.spend, p.lpv);
 
+  const kpiBase = [
+    { label: "Cliques no link", value: formatInt(t.clicks), delta: delta(t.clicks, p.clicks), goodWhen: "up" as const },
+    { label: "CPC", value: formatBRL(t.cpc), delta: delta(t.cpc, p.cpc), goodWhen: "down" as const },
+    { label: "Impressões", value: formatInt(t.impressions), delta: delta(t.impressions, p.impressions), goodWhen: "neutral" as const },
+  ];
+  const spendKpi = { label: "Valor Investido", value: formatBRL(t.spend), delta: delta(t.spend, p.spend), goodWhen: "neutral" as const };
+
   const kpis =
-    mode === "leads"
+    mode === "sales"
       ? [
-          { label: "Valor Investido", value: formatBRL(t.spend), delta: delta(t.spend, p.spend), goodWhen: "neutral" as const },
-          { label: "Leads", value: formatInt(t.leads), delta: delta(t.leads, p.leads), goodWhen: "up" as const },
-          { label: "CPL", value: formatBRL(t.cpl), delta: delta(t.cpl, p.cpl), goodWhen: "down" as const },
-          { label: "Cliques no link", value: formatInt(t.clicks), delta: delta(t.clicks, p.clicks), goodWhen: "up" as const },
-          { label: "CPC", value: formatBRL(t.cpc), delta: delta(t.cpc, p.cpc), goodWhen: "down" as const },
-          { label: "Impressões", value: formatInt(t.impressions), delta: delta(t.impressions, p.impressions), goodWhen: "neutral" as const },
+          spendKpi,
+          { label: "Compras", value: formatInt(t.purchases), delta: delta(t.purchases, p.purchases), goodWhen: "up" as const },
+          { label: "CPA", value: formatBRL(t.cpa), delta: delta(t.cpa, p.cpa), goodWhen: "down" as const },
+          { label: "Valor de conversão", value: formatBRL(t.purchaseValue), delta: delta(t.purchaseValue, p.purchaseValue), goodWhen: "up" as const },
+          { label: "ROAS", value: fmtRoas(t.roas), delta: delta(t.roas, p.roas), goodWhen: "up" as const },
+          { label: "Checkouts iniciados", value: formatInt(t.checkouts), delta: delta(t.checkouts, p.checkouts), goodWhen: "up" as const },
         ]
-      : [
-          { label: "Valor Investido", value: formatBRL(t.spend), delta: delta(t.spend, p.spend), goodWhen: "neutral" as const },
-          { label: "Visualizações da página", value: formatInt(t.lpv), delta: delta(t.lpv, p.lpv), goodWhen: "up" as const },
-          { label: "Custo por visualização", value: formatBRL(cpLpv), delta: delta(cpLpv, cpLpvPrev), goodWhen: "down" as const },
-          { label: "Cliques no link", value: formatInt(t.clicks), delta: delta(t.clicks, p.clicks), goodWhen: "up" as const },
-          { label: "CPC", value: formatBRL(t.cpc), delta: delta(t.cpc, p.cpc), goodWhen: "down" as const },
-          { label: "Impressões", value: formatInt(t.impressions), delta: delta(t.impressions, p.impressions), goodWhen: "neutral" as const },
-        ];
+      : mode === "leads"
+        ? [
+            spendKpi,
+            { label: "Leads", value: formatInt(t.leads), delta: delta(t.leads, p.leads), goodWhen: "up" as const },
+            { label: "CPL", value: formatBRL(t.cpl), delta: delta(t.cpl, p.cpl), goodWhen: "down" as const },
+            ...kpiBase,
+          ]
+        : [
+            spendKpi,
+            { label: "Visualizações da página", value: formatInt(t.lpv), delta: delta(t.lpv, p.lpv), goodWhen: "up" as const },
+            { label: "Custo por visualização", value: formatBRL(cpLpv), delta: delta(cpLpv, cpLpvPrev), goodWhen: "down" as const },
+            ...kpiBase,
+          ];
 
   const rates = [
     { label: "CTR", value: formatPct(t.ctr), delta: delta(t.ctr, p.ctr), goodWhen: "up" as const },
@@ -114,11 +155,21 @@ function MetaStage({ stage }: { stage: Stage }) {
     { label: "Tx. de carregamento", value: formatPct(t.loadRate), delta: delta(t.loadRate, p.loadRate), goodWhen: "up" as const },
     mode === "leads"
       ? { label: "Tx. de conversão", value: formatPct(t.convRate), delta: delta(t.convRate, p.convRate), goodWhen: "up" as const }
-      : { label: "Frequência", value: freq === null ? "—" : freq.toFixed(2).replace(".", ","), delta: delta(freq, freqPrev), goodWhen: "neutral" as const },
+      : mode === "sales"
+        ? { label: "Tx. checkout → compra", value: formatPct(t.checkoutRate), delta: delta(t.checkoutRate, p.checkoutRate), goodWhen: "up" as const }
+        : { label: "Frequência", value: freq === null ? "—" : freq.toFixed(2).replace(".", ","), delta: delta(freq, freqPrev), goodWhen: "neutral" as const },
   ];
 
   const funnelSteps =
-    mode === "leads"
+    mode === "sales"
+      ? [
+          { label: "Impressões", value: t.impressions },
+          { label: "Cliques", value: t.clicks, rateLabel: "CTR", rate: t.ctr },
+          { label: "PageViews", value: t.lpv, rateLabel: "Tx. de carregamento", rate: t.loadRate },
+          { label: "Checkouts", value: t.checkouts, rateLabel: "PageView → checkout", rate: safeDiv(t.checkouts, t.lpv) },
+          { label: "Compras", value: t.purchases, rateLabel: "Tx. checkout → compra", rate: t.checkoutRate },
+        ]
+      : mode === "leads"
       ? [
           { label: "Impressões", value: t.impressions },
           { label: "Cliques", value: t.clicks, rateLabel: "CTR", rate: t.ctr },
@@ -131,8 +182,9 @@ function MetaStage({ stage }: { stage: Stage }) {
           { label: "PageViews", value: t.lpv, rateLabel: "Tx. de carregamento", rate: t.loadRate },
         ];
 
-  const pickMain = (r: GroupRow) => (mode === "leads" ? r.leads : r.lpv);
-  const mainTotal = mode === "leads" ? t.leads : t.lpv;
+  const pickMain = (r: GroupRow) => (mode === "leads" ? r.leads : mode === "sales" ? r.purchases : r.lpv);
+  const mainTotal = mode === "leads" ? t.leads : mode === "sales" ? t.purchases : t.lpv;
+  const mainNoun = mode === "leads" ? "leads" : mode === "sales" ? "compras" : "visualizações";
 
   return (
     <>
@@ -146,7 +198,13 @@ function MetaStage({ stage }: { stage: Stage }) {
         <ChartCard
           className="lg:col-span-3"
           title="Funil"
-          description={mode === "leads" ? "Impressões → Cliques → PageViews → Leads" : "Impressões → Cliques → PageViews"}
+          description={
+            mode === "leads"
+              ? "Impressões → Cliques → PageViews → Leads"
+              : mode === "sales"
+                ? "Impressões → Cliques → PageViews → Checkouts → Compras"
+                : "Impressões → Cliques → PageViews"
+          }
           empty={empty}
           index={1}
         >
@@ -165,8 +223,8 @@ function MetaStage({ stage }: { stage: Stage }) {
           <DonutChart data={topSlices(byAdset, (r) => r.spend)} valueFormatter={formatBRL} centerValue={formatBRL(t.spend)} centerLabel="investido" />
         </ChartCard>
         <ChartCard
-          title={mode === "leads" ? "Distribuição de leads por público" : "Distribuição de visualizações por público"}
-          description={mode === "leads" ? "Leads por conjunto de anúncios" : "Visualizações da página por conjunto de anúncios"}
+          title={`Distribuição de ${mainNoun} por público`}
+          description={`${mainNoun[0].toUpperCase()}${mainNoun.slice(1)} por conjunto de anúncios`}
           empty={mainTotal === 0}
           index={3}
         >
@@ -174,7 +232,7 @@ function MetaStage({ stage }: { stage: Stage }) {
             data={topSlices(byAdset, pickMain)}
             valueFormatter={formatInt}
             centerValue={formatInt(mainTotal)}
-            centerLabel={mode === "leads" ? "leads" : "visualizações"}
+            centerLabel={mainNoun}
             colors={[...COLORS.series].reverse()}
           />
         </ChartCard>
@@ -185,7 +243,7 @@ function MetaStage({ stage }: { stage: Stage }) {
       </ChartCard>
 
       <ChartCard title="Públicos" description="Desempenho por conjunto de anúncios" empty={empty} index={5}>
-        <DataTable rows={byAdset} columns={columns("Público", mode)} rowKey={(r) => r.key} defaultSort={{ key: mode === "leads" ? "leads" : "lpv", dir: "desc" }} />
+        <DataTable rows={byAdset} columns={columns("Público", mode)} rowKey={(r) => r.key} defaultSort={{ key: mode === "leads" ? "leads" : mode === "sales" ? "purchases" : "lpv", dir: "desc" }} />
       </ChartCard>
 
       <ChartCard

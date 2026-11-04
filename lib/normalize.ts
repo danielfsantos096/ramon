@@ -58,8 +58,16 @@ const META_ALIASES: Aliases = {
   clicks: ["Link Clicks", "Cliques no link", "Clicks", "Cliques"],
   lpv: ["Landing Page Views", "Visualizações da página de destino", "LPV", "Page Views", "PageViews"],
   leads: ["Website Leads", "Leads no site", "Leads"],
+  checkouts: ["Checkouts Initiated", "Website Checkouts Initiated", "Finalizações de compra iniciadas"],
+  purchases: ["Website Purchases", "Compras no site", "Purchases"],
+  purchaseValue: [
+    "Website Purchases Conversion Value",
+    "Website Purchase Conversion Value",
+    "Purchases Conversion Value",
+    "Valor de conversão de compras no site",
+  ],
 };
-const META_FALLBACK = { day: 0, campaign: 1, adset: 2, ad: 3, spend: 4, reach: 5, impressions: 6, clicks: 7, lpv: 8, leads: 9 };
+const META_FALLBACK = { day: 0, campaign: 1, adset: 2, ad: 3, spend: 4, reach: 5, impressions: 6, clicks: 7, lpv: 8, leads: 9, checkouts: 14, purchases: 15, purchaseValue: 16 };
 
 export function parseMeta(rows: Row[], warnings: string[]): AdRow[] {
   if (rows.length < 2) return [];
@@ -87,6 +95,9 @@ export function parseMeta(rows: Row[], warnings: string[]): AdRow[] {
       clicks: parseNumberBR(get(row, idx.clicks)),
       lpv: parseNumberBR(get(row, idx.lpv)),
       leads: parseNumberBR(get(row, idx.leads)),
+      checkouts: parseNumberBR(get(row, idx.checkouts)),
+      purchases: parseNumberBR(get(row, idx.purchases)),
+      purchaseValue: parseNumberBR(get(row, idx.purchaseValue)),
     };
     accumulate(out, r);
   }
@@ -107,6 +118,9 @@ function accumulate(map: Map<string, AdRow>, r: AdRow) {
   cur.clicks += r.clicks;
   cur.lpv += r.lpv;
   cur.leads += r.leads;
+  cur.checkouts += r.checkouts;
+  cur.purchases += r.purchases;
+  cur.purchaseValue += r.purchaseValue;
 }
 
 /* ------------------------------------------------------------------ */

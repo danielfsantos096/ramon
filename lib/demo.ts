@@ -48,6 +48,7 @@ export function demoData(): ApiData {
             spend: +spend.toFixed(2),
             reach: Math.round(impressions * 0.7),
             impressions, clicks, lpv, leads: l,
+            checkouts: 0, purchases: 0, purchaseValue: 0,
           });
           // leads do AC (com UTM) a partir dos leads Meta
           for (let k = 0; k < l; k++) {
@@ -101,6 +102,13 @@ export function demoData(): ApiData {
             date: iso(dt), stage: stageOf(campaign), campaign, adset, ad,
             spend: +spend.toFixed(2), reach: Math.round(impressions * 0.6), impressions, clicks,
             lpv: Math.round(clicks * (0.7 + rand() * 0.2)), leads: 0,
+            ...(stageOf(campaign) === "rmkt"
+              ? (() => {
+                  const co = Math.round(clicks * (0.08 + rand() * 0.08));
+                  const pu = Math.round(co * (0.15 + rand() * 0.25));
+                  return { checkouts: co, purchases: pu, purchaseValue: pu * 497 };
+                })()
+              : { checkouts: 0, purchases: 0, purchaseValue: 0 }),
           });
         }
       }

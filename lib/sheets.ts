@@ -84,33 +84,63 @@ export async function loadData(): Promise<ApiData> {
   };
 }
 
+/** Traduz o erro da API do Google em uma mensagem que diz o que corrigir (sem vazar IDs ou chaves). */
+function describeSheetsError(e: unknown): string {
+  const err = e as { code?: number | string; status?: number; message?: string };
+  const code = Number(err?.code ?? err?.status);
+  const msg = String(err?.message ?? "");
+  if (code === 403 || /permission|PERMISSION_DENIED/i.test(msg)) {
+    return "Sem permissão (403): a planilha de vendas ainda não foi compartilhada com a Service Account (e-mail em GOOGLE_SERVICE_ACCOUNT_EMAIL) como Leitor. Quem é dono da planilha precisa compartilhar.";
+  }
+  if (code === 404 || /not found/i.test(msg)) {
+    return "Planilha de vendas não encontrada (404): confira SALES_SHEET_ID.";
+  }
+  if (code === 400 || /unable to parse range/i.test(msg)) {
+    return `Aba "${SHEET_TABS.sales}" não encontrada na planilha de vendas (400): confira o nome da aba.`;
+  }
+  if (code === 429) return "Limite de leituras do Google atingido (429): tente de novo em alguns minutos.";
+  if (code === 401 || /invalid_grant|unauthorized/i.test(msg)) {
+    return "Credenciais do Google inválidas (401): confira GOOGLE_SERVICE_ACCOUNT_EMAIL e GOOGLE_PRIVATE_KEY.";
+  }
+  return `Falha ao ler a aba Hotmart${Number.isFinite(code) ? ` (código ${code})` : ""}.`;
+}
+
+async function readSalesTab(sheets: ReturnType<typeof google.sheets>, spreadsheetId: string, warnings: string[]) {
+  const tab = SHEET_TABS.sales;
+  // Só A:B e F:W — Nome, Email e Telefone (C:E) nunca saem da planilha.
+  const [left, right] = await Promise.all([
+    readRange(sheets, spreadsheetId, `'${tab}'!A1:B`),
+    readRange(sheets, spreadsheetId, `'${tab}'!F1:W`),
+  ]);
+  const n = Math.max(left.length, right.length);
+  const merged: Row[] = [];
+  for (let i = 0; i < n; i++) {
+    const l = left[i] ?? [];
+    merged.push([l[0] ?? "", l[1] ?? "", ...(right[i] ?? [])]);
+  }
+  return parseSales(merged, warnings);
+}
+
 /**
- * Vendas: planilha separada ("Ramon Souza - Vendas Gerais", variável SALES_SHEET_ID), aba "Hotmart".
- * Lê só A:B e F:W — Nome, Email e Telefone (C:E) nunca saem da planilha.
- * Se falhar (sem permissão, ID ausente), o restante do dashboard continua funcionando.
+ * Vendas, aba "Hotmart". Ordem de tentativa:
+ *  1) planilha "Ramon Souza - Vendas Gerais" (SALES_SHEET_ID ou padrão);
+ *  2) aba "Hotmart" da própria planilha da campanha (SHEET_ID) — plano B, por exemplo uma aba
+ *     alimentada com IMPORTRANGE da planilha de vendas.
+ * Se nenhuma funcionar, só a aba Hotmart mostra o motivo; o restante do dashboard segue normal.
  */
 async function loadSales(warnings: string[]): Promise<{ sales: SaleAgg[]; salesError?: string }> {
-  const salesId = process.env.SALES_SHEET_ID || SALES_SHEET_ID_DEFAULT;
-  try {
-    const { sheets } = getClient();
-    const tab = SHEET_TABS.sales;
-    const [left, right] = await Promise.all([
-      readRange(sheets, salesId, `'${tab}'!A1:B`),
-      readRange(sheets, salesId, `'${tab}'!F1:W`),
-    ]);
-    const n = Math.max(left.length, right.length);
-    const merged: Row[] = [];
-    for (let i = 0; i < n; i++) {
-      const l = left[i] ?? [];
-      merged.push([l[0] ?? "", l[1] ?? "", ...(right[i] ?? [])]);
+  const { sheets, sheetId } = getClient();
+  const primary = process.env.SALES_SHEET_ID || SALES_SHEET_ID_DEFAULT;
+  const ids = primary === sheetId ? [primary] : [primary, sheetId];
+
+  let firstError: unknown = null;
+  for (const id of ids) {
+    try {
+      return { sales: await readSalesTab(sheets, id, warnings) };
+    } catch (e) {
+      console.error("[sales]", id === primary ? "planilha de vendas" : "planilha da campanha", e instanceof Error ? e.message : e);
+      if (firstError === null) firstError = e;
     }
-    return { sales: parseSales(merged, warnings) };
-  } catch (e) {
-    console.error("[sales]", e instanceof Error ? e.message : e);
-    return {
-      sales: [],
-      salesError:
-        "Não foi possível ler a aba Hotmart. Confira SALES_SHEET_ID e se a planilha de vendas foi compartilhada com a Service Account.",
-    };
   }
+  return { sales: [], salesError: describeSheetsError(firstError) };
 }

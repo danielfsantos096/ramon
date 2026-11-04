@@ -200,16 +200,22 @@ export interface AdTotals {
   clicks: number;
   lpv: number;
   leads: number;
+  checkouts: number;
+  purchases: number;
+  purchaseValue: number;
   ctr: number | null;
   cpc: number | null;
   cpm: number | null;
   cpl: number | null;
+  cpa: number | null; // valor / compras
+  roas: number | null; // valor de conversão / valor
+  checkoutRate: number | null; // compras / checkouts
   loadRate: number | null; // LPV / cliques
   convRate: number | null; // leads / LPV
 }
 
 export function totalsOf(rows: AdRow[]): AdTotals {
-  let spend = 0, reach = 0, impressions = 0, clicks = 0, lpv = 0, leads = 0;
+  let spend = 0, reach = 0, impressions = 0, clicks = 0, lpv = 0, leads = 0, checkouts = 0, purchases = 0, purchaseValue = 0;
   for (const r of rows) {
     spend += r.spend;
     reach += r.reach;
@@ -217,9 +223,15 @@ export function totalsOf(rows: AdRow[]): AdTotals {
     clicks += r.clicks;
     lpv += r.lpv;
     leads += r.leads;
+    checkouts += r.checkouts;
+    purchases += r.purchases;
+    purchaseValue += r.purchaseValue;
   }
   return {
-    spend, reach, impressions, clicks, lpv, leads,
+    spend, reach, impressions, clicks, lpv, leads, checkouts, purchases, purchaseValue,
+    cpa: safeDiv(spend, purchases),
+    roas: safeDiv(purchaseValue, spend),
+    checkoutRate: safeDiv(purchases, checkouts),
     ctr: safeDiv(clicks, impressions),
     cpc: safeDiv(spend, clicks),
     cpm: impressions > 0 ? (spend / impressions) * 1000 : null,

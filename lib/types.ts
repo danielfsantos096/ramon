@@ -14,6 +14,9 @@ export interface AdRow {
   clicks: number;
   lpv: number; // Landing Page Views
   leads: number; // Website Leads
+  checkouts: number; // Checkouts Initiated
+  purchases: number; // Website Purchases
+  purchaseValue: number; // Website Purchases Conversion Value
 }
 
 /**

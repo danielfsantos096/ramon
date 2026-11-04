@@ -11,10 +11,10 @@ import { UpdatedBadge } from "./updated-badge";
 const NAV = [
   { href: "/", label: "Visão geral", icon: BarChart3 },
   { href: "/meta-ads", label: "Captação", icon: Megaphone },
+  { href: "/leads", label: "Análise de Leads", icon: Users },
   { href: "/avisos", label: "Avisos", icon: Bell },
   { href: "/rmkt", label: "RMKT", icon: Repeat2 },
   { href: "/vendas", label: "Hotmart", icon: ShoppingCart },
-  { href: "/leads", label: "Análise de Leads", icon: Users },
 ] as const;
 
 export function AppHeader() {
