@@ -7,7 +7,7 @@ Fonte de dados: Google Sheets (Service Account, leitura somente no servidor), ab
 - `/` Visão geral — 6 KPIs, evolução diária, origem dos leads, investimento diário e leads diários (tráfego x AC) — **só Captação**
 - `/meta-ads` **Captação** — KPIs, funil, CTR/CPM/Tx. carregamento/Tx. conversão, verba por público, tabelas ordenáveis (campanha, público, criativo) com heatmap, 3 melhores criativos + pior, botão Melhor → Pior
 - `/avisos` **Avisos** e `/rmkt` **RMKT** — mesma estrutura, para as campanhas cujo nome contém "Avisos" / "RMKT" (ver `STAGE_TERMS` em `lib/config.ts`). Em **RMKT** a métrica principal é a compra (Website Purchases: compras, CPA, valor de conversão, ROAS, checkouts), sem nada de lead. Em Avisos, sem Website Leads na etapa, o resultado é a visualização da página (custo por visualização)
-- `/vendas` **Hotmart** — vendas do produto `SALES_PRODUCT`: vendas, faturamento, ticket médio, investimento da Meta (todas as etapas), ROAS, CAC, devoluções, vendas por dia, pagamento, origem, campanha/criativo (UTMs) e status
+- `/vendas` **Hotmart** — vendas dos produtos que contêm `SALES_PRODUCT_TERM` ("TI TOTAL") no nome, com caixa de seleção de produto (padrão: `SALES_DEFAULT_PRODUCT`): vendas, faturamento, ticket médio, investimento da Meta (todas as etapas), ROAS, CAC, devoluções, vendas por dia, pagamento, origem, campanha/criativo (UTMs) e status
 - `/leads` — leads totais/tráfego/orgânico/sem UTMs/CPL, leads por dia, barras por Source, Content, Term, Medium e Campaign
 
 **Etapas e datas:** a etapa de cada campanha é definida pelo nome (contém "RMKT" → RMKT; contém "Avisos" → Avisos; o resto é Captação). O período padrão de cada aba vai do primeiro ao último dia com investimento na etapa (se ainda está rodando, o fim é hoje); a Hotmart usa do início da captação até hoje.
@@ -56,7 +56,7 @@ Suba o repositório no GitHub, importe na Vercel e cadastre as mesmas variáveis
 | Aba | Leitura |
 |---|---|
 | Meta Ads | `A:Q` (colunas auxiliares à direita de Q são ignoradas) |
-| Hotmart (planilha de vendas, ou aba "Hotmart" da planilha da campanha como plano B) | `A:B` e `F:W` — Nome, Email e Telefone (`C:E`) nunca são lidos; só o produto `SALES_PRODUCT`, sem transações duplicadas; chegam agregadas por dia/status/UTMs |
+| Hotmart (planilha de vendas, ou aba "Hotmart" da planilha da campanha como plano B) | `A:B` e `F:W` — Nome, Email e Telefone (`C:E`) nunca são lidos; só produtos que contêm `SALES_PRODUCT_TERM`, sem transações duplicadas; chegam agregadas por dia/status/UTMs |
 | Leads | **somente `D:L`** (UTMs e data) — Nome, Email e Telefone nunca são lidos; os leads chegam ao navegador agregados por dia/UTMs |
 
 Nenhuma outra aba é lida; todas as métricas são calculadas dessas duas abas brutas.

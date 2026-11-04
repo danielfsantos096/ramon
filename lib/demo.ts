@@ -134,6 +134,7 @@ export function demoData(): ApiData {
       const gross = r > 0.7 ? 747 : 497;
       sales.push({
         date: iso(dt),
+        product: r > 0.8 ? "TI TOTAL - Mentoria VIP" : r > 0.7 ? "TI Total para Área Fiscal e Controle" : "TI TOTAL - Assinatura - Plataforma de Conteúdos",
         status: r > 0.93 ? "REFUNDED" : r > 0.88 ? "CANCELED" : r > 0.6 ? "APPROVED" : "COMPLETED",
         payment: payments[Math.floor(rand() * payments.length)],
         offer: "ieg0jgxq", installments: 1 + Math.floor(rand() * 12),

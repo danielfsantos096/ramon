@@ -41,6 +41,7 @@ export interface LeadAgg {
  */
 export interface SaleAgg {
   date: string; // ISO yyyy-mm-dd
+  product: string; // Nome do produto
   status: string; // COMPLETED, APPROVED, REFUNDED…
   payment: string; // CREDIT_CARD, PIX…
   offer: string; // Código da oferta
@@ -61,7 +62,7 @@ export interface ApiData {
   lastDate: string | null;
   ads: AdRow[];
   leads: LeadAgg[];
-  /** Vendas do produto configurado em SALES_PRODUCT (aba Hotmart). */
+  /** Vendas dos produtos que contêm SALES_PRODUCT_TERM no nome (aba Hotmart). */
   sales: SaleAgg[];
   /** Preenchido quando a aba de vendas não pôde ser lida (o resto do dashboard segue funcionando). */
   salesError?: string;

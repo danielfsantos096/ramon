@@ -25,8 +25,10 @@ export const SALES_SHEET_ID_DEFAULT = "1xALGG-tMubq932JcanQpzrcN9uX4Rtz8ufYlcxXU
 /** Abertura do carrinho: a aba Hotmart começa neste dia (vendas anteriores não entram). */
 export const SALES_START = "2026-11-03";
 
-/** Produto das vendas exibido na aba Hotmart (nome exato, sem diferenciar maiúsculas/acentos). */
-export const SALES_PRODUCT = "TI TOTAL - Assinatura - Plataforma de Conteúdos";
+/** A aba Hotmart lê todos os produtos cujo "Nome do produto" contém este termo (sem diferenciar maiúsculas/acentos). */
+export const SALES_PRODUCT_TERM = "TI TOTAL";
+/** Produto pré-selecionado na caixa de seleção da aba Hotmart (se existir nas vendas). Limpe a seleção para ver todos. */
+export const SALES_DEFAULT_PRODUCT = "TI TOTAL - Assinatura - Plataforma de Conteúdos";
 
 /** Status da Hotmart que contam como venda. Reembolso, chargeback e cancelamento ficam de fora. */
 export const SALES_PAID_STATUSES = ["COMPLETED", "APPROVED"];

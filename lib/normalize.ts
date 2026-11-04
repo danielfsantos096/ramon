@@ -8,7 +8,7 @@ import {
   parseDateISO,
   parseNumberBR,
 } from "./parse";
-import { SALES_PRODUCT } from "./config";
+import { SALES_PRODUCT_TERM } from "./config";
 import { stageOf } from "./stage";
 import type { AdRow, LeadAgg, SaleAgg } from "./types";
 
@@ -205,7 +205,7 @@ const normProduct = (v: unknown) => normHeader(cleanText(v));
 
 /**
  * `rows` = colunas A:B + F:W da aba (Nome/Email/Telefone ficam fora da leitura).
- * Só entram vendas do produto SALES_PRODUCT; transações repetidas contam uma vez (vale a última linha).
+ * Só entram vendas de produtos cujo nome contém SALES_PRODUCT_TERM; transações repetidas contam uma vez (vale a última linha).
  */
 export function parseSales(rows: Row[], warnings: string[]): SaleAgg[] {
   if (rows.length < 2) return [];
@@ -214,12 +214,12 @@ export function parseSales(rows: Row[], warnings: string[]): SaleAgg[] {
     warnings.push("Hotmart: colunas Data/Status/Nome do produto não encontradas.");
     return [];
   }
-  const wanted = normProduct(SALES_PRODUCT);
+  const wanted = normProduct(SALES_PRODUCT_TERM);
   const byTx = new Map<string, Row>();
   let n = 0;
   for (const row of rows.slice(1)) {
     const prod = normProduct(get(row, idx.product));
-    if (!prod || prod !== wanted) continue;
+    if (!prod || !prod.includes(wanted)) continue;
     const tx = cleanText(get(row, idx.tx)) || `__${n++}`;
     byTx.set(tx, row);
   }
@@ -230,6 +230,7 @@ export function parseSales(rows: Row[], warnings: string[]): SaleAgg[] {
     if (!date) continue;
     const sale: SaleAgg = {
       date,
+      product: cleanText(get(row, idx.product)),
       status: cleanText(get(row, idx.status)).toUpperCase() || "DESCONHECIDO",
       payment: cleanText(get(row, idx.payment)).toUpperCase() || "—",
       offer: cleanText(get(row, idx.offer)) || "—",
@@ -243,7 +244,7 @@ export function parseSales(rows: Row[], warnings: string[]): SaleAgg[] {
       gross: parseNumberBR(get(row, idx.gross)),
       commission: parseNumberBR(get(row, idx.commission)),
     };
-    const key = [sale.date, sale.status, sale.payment, sale.offer, sale.installments, sale.source, sale.medium, sale.campaign, sale.term, sale.content].join("\u0001");
+    const key = [sale.date, sale.product, sale.status, sale.payment, sale.offer, sale.installments, sale.source, sale.medium, sale.campaign, sale.term, sale.content].join("\u0001");
     const cur = out.get(key);
     if (cur) {
       cur.count += 1;

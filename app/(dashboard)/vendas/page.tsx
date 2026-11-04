@@ -10,7 +10,8 @@ import { PageGate } from "@/components/dashboard/page-gate";
 import { DonutChart } from "@/components/charts/donut-chart";
 import { StackedDailyChart } from "@/components/charts/stacked-daily-chart";
 import { Card } from "@/components/ui/card";
-import { COLORS, META_COLOR, SALES_PRODUCT, SALES_START } from "@/lib/config";
+import { COLORS, META_COLOR, SALES_DEFAULT_PRODUCT, SALES_START } from "@/lib/config";
+import { MultiSelect } from "@/components/dashboard/multi-select";
 import { formatBRL, formatInt, formatPct } from "@/lib/format";
 import { delta, safeDiv } from "@/lib/metrics";
 import { NO_UTM } from "@/lib/parse";
@@ -44,8 +45,22 @@ function Sales() {
 
   // só vendas a partir da abertura do carrinho
   const sales = React.useMemo(() => (data?.sales ?? []).filter((x) => x.date >= SALES_START), [data?.sales]);
-  const cur = React.useMemo(() => salesInRange(sales, range.from, range.to), [sales, range]);
-  const prev = React.useMemo(() => salesInRange(sales, prevRange.from, prevRange.to), [sales, prevRange]);
+  // Caixa de seleção de produto (todos os que contêm "TI TOTAL"); vazio = todos.
+  const products = React.useMemo(() => [...new Set(sales.map((x) => x.product).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR")), [sales]);
+  const productCounts = React.useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const x of sales) if (x.date >= range.from && x.date <= range.to) m[x.product] = (m[x.product] ?? 0) + x.count;
+    return m;
+  }, [sales, range]);
+  const [picked, setPicked] = React.useState<string[] | null>(null);
+  const selected = picked ?? (products.includes(SALES_DEFAULT_PRODUCT) ? [SALES_DEFAULT_PRODUCT] : []);
+  const byProduct = React.useMemo(
+    () => (selected.length ? sales.filter((x) => selected.includes(x.product)) : sales),
+    [sales, selected]
+  );
+
+  const cur = React.useMemo(() => salesInRange(byProduct, range.from, range.to), [byProduct, range]);
+  const prev = React.useMemo(() => salesInRange(byProduct, prevRange.from, prevRange.to), [byProduct, prevRange]);
   const s = React.useMemo(() => summarizeSales(cur), [cur]);
   const p = React.useMemo(() => summarizeSales(prev), [prev]);
 
@@ -109,10 +124,16 @@ function Sales() {
 
   return (
     <>
-      <p className="text-xs text-muted-foreground">
-        Produto: <span className="font-medium text-foreground">{SALES_PRODUCT}</span> · vendas com status Completa/Aprovada; reembolso,
-        chargeback e disputa aparecem em Devoluções.
-      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <MultiSelect
+          label="Produto"
+          options={products}
+          counts={productCounts}
+          value={selected}
+          onChange={setPicked}
+          hint='Produtos com "TI TOTAL" no nome. Sem seleção = todos.'
+        />
+      </div>
 
       <section aria-label="Indicadores de vendas" className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
         {kpis.map((k, i) => (
